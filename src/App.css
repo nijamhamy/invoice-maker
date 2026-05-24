@@ -1,0 +1,430 @@
+/* =========================================
+   CORE APP SHELL
+========================================= */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* FIX 2: Use dvh on html so .app-container can just fill 100% */
+  -webkit-text-size-adjust: 100%;
+}
+
+@supports (height: 100dvh) {
+  html {
+    height: 100dvh;
+  }
+}
+
+/* FIX 3: Remove box-sizing: inherit pattern — match Bootstrap's reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background-color: #f8f9fb;
+  color: #111827;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-shadow: none;
+}
+
+#root {
+  overflow: hidden;
+}
+
+/* Dynamic app height */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* FIX 2: Fill #root height — no double viewport calculation */
+  height: 100%;
+  overflow: hidden;
+  background-color: #f8f9fb;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Fallback for browsers that do not support dvh */
+@supports not (height: 100dvh) {
+  html {
+    height: 100vh;
+  }
+
+  .app-container {
+    height: 100vh;
+  }
+}
+
+/* Optional centered content helpers */
+.app-shell {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.app-main {
+  flex: 1 1 0;
+  min-height: 0;
+  /* FIX 4: Use overflow: clip so child scroll containers still work */
+  overflow: clip;
+}
+
+.scroll-content {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* =========================================
+   SAFE AREA HELPERS
+========================================= */
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-bottom-comfort {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+/* Use only for fixed or sticky bars near edges */
+.edge-top-space {
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
+}
+
+.edge-bottom-space {
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+}
+
+/* =========================================
+   HEADER / FOOTER STRUCTURE
+========================================= */
+
+.app-header {
+  flex-shrink: 0;
+  z-index: 1020;
+}
+
+.app-footer {
+  flex-shrink: 0;
+  z-index: 1030;
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.footer-action-area {
+  padding: 12px 20px;
+}
+
+/* Legacy helper if used in some pages */
+.bottom-nav-tabs {
+  min-height: 60px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background-color: #ffffff;
+}
+
+/* =========================================
+   GLOBAL UI POLISH
+========================================= */
+
+.card,
+.navbar,
+.footer,
+.btn,
+.form-control,
+.form-select,
+.form-check-input,
+.modal-content,
+.offcanvas,
+.list-group-item {
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+.form-control:focus,
+.form-select:focus,
+.btn:focus,
+.btn:focus-visible {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+a {
+  text-decoration: none;
+}
+
+/* Cleaner mobile scroll areas */
+.scroll-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Optional thin scrollbar for desktop containers */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+}
+
+/* =========================================
+   DARK MODE
+========================================= */
+
+body.dark-mode,
+body[data-theme="dark"],
+html[data-theme="dark"] body {
+  /* FIX 5: color-scheme tells WebView to render native UI in dark */
+  color-scheme: dark;
+  background-color: #121212 !important;
+  color: #e5e7eb !important;
+}
+
+.dark-mode .app-container,
+.dark-mode .app-shell,
+.dark-mode #root,
+[data-theme="dark"] .app-container,
+[data-theme="dark"] .app-shell,
+[data-theme="dark"] #root {
+  background-color: #121212 !important;
+}
+
+.dark-mode .bg-light,
+[data-theme="dark"] .bg-light {
+  background-color: #1a1a1a !important;
+}
+
+.dark-mode .bg-white,
+.dark-mode .card,
+.dark-mode .app-header,
+.dark-mode .app-footer,
+.dark-mode .modal-content,
+.dark-mode .offcanvas,
+.dark-mode .list-group-item,
+.dark-mode .dropdown-menu,
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .card,
+[data-theme="dark"] .app-header,
+[data-theme="dark"] .app-footer,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .offcanvas,
+[data-theme="dark"] .list-group-item,
+[data-theme="dark"] .dropdown-menu {
+  background-color: #1e1e1e !important;
+  color: #ffffff !important;
+  border-color: #333333 !important;
+  background-image: none !important;
+}
+
+.dark-mode .text-dark,
+.dark-mode .text-black,
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .text-black {
+  color: #ffffff !important;
+}
+
+.dark-mode .text-muted,
+.dark-mode .text-secondary,
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .text-secondary {
+  color: #a0a0a0 !important;
+}
+
+.dark-mode .border,
+.dark-mode .border-top,
+.dark-mode .border-bottom,
+.dark-mode .border-start,
+.dark-mode .border-end,
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-top,
+[data-theme="dark"] .border-bottom,
+[data-theme="dark"] .border-start,
+[data-theme="dark"] .border-end {
+  border-color: #333333 !important;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select,
+.dark-mode textarea,
+.dark-mode input,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] textarea,
+[data-theme="dark"] input {
+  background-color: #2a2a2a !important;
+  border-color: #444444 !important;
+  color: #ffffff !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+  filter: none !important;
+  background-image: none !important;
+}
+
+.dark-mode .form-control::placeholder,
+.dark-mode textarea::placeholder,
+.dark-mode input::placeholder,
+[data-theme="dark"] .form-control::placeholder,
+[data-theme="dark"] textarea::placeholder,
+[data-theme="dark"] input::placeholder {
+  color: #8f8f8f !important;
+}
+
+.dark-mode .form-floating>label,
+[data-theme="dark"] .form-floating>label {
+  color: #9ca3af !important;
+  text-shadow: none !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+.dark-mode .btn-light,
+[data-theme="dark"] .btn-light {
+  background-color: #2a2a2a !important;
+  border-color: #3a3a3a !important;
+  color: #ffffff !important;
+}
+
+.dark-mode .btn-outline-light,
+[data-theme="dark"] .btn-outline-light {
+  color: #ffffff !important;
+  border-color: #666 !important;
+}
+
+.dark-mode .btn-close,
+[data-theme="dark"] .btn-close {
+  filter: none !important;
+  opacity: 0.9;
+}
+
+.dark-mode .shadow-sm,
+.dark-mode .shadow,
+.dark-mode .shadow-lg,
+[data-theme="dark"] .shadow-sm,
+[data-theme="dark"] .shadow,
+[data-theme="dark"] .shadow-lg {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* FIX 1: Replace wildcard * dark mode block with targeted elements only.
+   Avoids breaking Bootstrap modal backdrop and other components. */
+.dark-mode .form-control,
+.dark-mode .form-select,
+.dark-mode textarea,
+.dark-mode input,
+.dark-mode .card,
+.dark-mode .modal-content,
+.dark-mode .offcanvas,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] textarea,
+[data-theme="dark"] input,
+[data-theme="dark"] .card,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .offcanvas {
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* =========================================
+   MODALS / OFFCANVAS
+========================================= */
+
+.modal,
+.offcanvas {
+  --bs-backdrop-opacity: 0.45;
+}
+
+.modal-content,
+.offcanvas {
+  border-radius: 18px;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* =========================================
+   UTILITIES
+========================================= */
+
+.tap-highlight-none {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.no-bounce {
+  overscroll-behavior: none;
+}
+
+/* FIX 6: Add safe-area-inset-bottom to spacer heights
+   so they are tall enough on notched iPhones */
+.content-spacer-bottom {
+  height: calc(110px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+}
+
+.content-spacer-bottom-lg {
+  height: calc(140px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+}
+
+/* =========================================
+   RESPONSIVE TWEAKS
+========================================= */
+
+@media (min-width: 768px) {
+  .app-shell {
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

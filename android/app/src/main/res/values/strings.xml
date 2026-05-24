@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Eazy Bill</string>
+    <string name="title_activity_main">Eazy Bill</string>
+    <string name="package_name">ccom.easybill.invoice.app</string>
+    <string name="custom_url_scheme">com.easybill.invoice.app</string>
+</resources>
