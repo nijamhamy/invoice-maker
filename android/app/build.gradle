@@ -8,8 +8,8 @@ android {
         applicationId "com.easybill.invoice.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "1.9"
+        versionCode 11
+        versionName "2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
@@ -25,9 +25,10 @@ android {
     }
 }
 
+// FIX: RevenueCat 13.x requires billing 8.x — upgraded from 7.0.0
 configurations.all {
     resolutionStrategy {
-        force 'com.android.billingclient:billing:7.0.0'
+        force 'com.android.billingclient:billing:8.0.0'
     }
 }
 
@@ -49,8 +50,8 @@ dependencies {
     // Google Mobile Ads SDK
     implementation 'com.google.android.gms:play-services-ads:23.3.0'
 
-    // Google Play Billing Library 7
-    implementation 'com.android.billingclient:billing:7.0.0'
+    // FIX: Updated to billing 8.0.0 for RevenueCat 13.x compatibility
+    implementation 'com.android.billingclient:billing:8.0.0'
 
     // Google User Messaging Platform (Consent SDK)
     implementation "com.google.android.ump:user-messaging-platform:2.2.0"

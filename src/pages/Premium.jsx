@@ -39,36 +39,39 @@ export default function Premium() {
                 setIsLoading(true);
                 setError("");
 
-
-                const [offerings, subscribed] = await Promise.all([
+                const [offeringsResult, subscribed] = await Promise.all([
                     getSubscriptionOfferings(),
                     getCustomerSubscriptionStatus(),
                 ]);
 
-
                 setIsSubscribed(subscribed);
 
+                // offeringsResult is already unwrapped in revenuecat.js
+                // .current is the default/current offering
+                const availablePackages = offeringsResult?.current?.availablePackages || [];
 
-                const availablePackages = offerings?.current?.availablePackages || [];
+                console.log("[Premium] packages count:", availablePackages.length);
+                console.log("[Premium] packages:", JSON.stringify(
+                    availablePackages.map(p => ({
+                        id: p.identifier,
+                        type: p.packageType,
+                        price: p.product?.priceString,
+                        productId: p.product?.productIdentifier,
+                    }))
+                ));
+
+                // Sort: Monthly first, Annual/Yearly second
+                // $rc_monthly -> packageType: "MONTHLY"
+                // $rc_annual  -> packageType: "ANNUAL"
                 const sortedPackages = [...availablePackages].sort((a, b) => {
-                    const order = {
-                        MONTHLY: 1,
-                        ANNUAL: 2,
-                        YEARLY: 2,
-                    };
-
-
+                    const order = { MONTHLY: 1, ANNUAL: 2, YEARLY: 2 };
                     const aType = String(a?.packageType || "").toUpperCase();
                     const bType = String(b?.packageType || "").toUpperCase();
-
-
                     return (order[aType] || 99) - (order[bType] || 99);
                 });
 
-
                 setPackages(sortedPackages);
                 setSelectedPackageId(sortedPackages?.[0]?.identifier || null);
-
 
                 if (!sortedPackages.length) {
                     setError("Premium plans are not available right now. Please try again later.");
@@ -81,7 +84,6 @@ export default function Premium() {
             }
         };
 
-
         loadPremiumData();
     }, []);
 
@@ -93,29 +95,31 @@ export default function Premium() {
 
     const getPackageMeta = (pkg) => {
         const type = String(pkg?.packageType || "").toUpperCase();
-        const title =
-            type === "ANNUAL" || type === "YEARLY"
-                ? "Yearly Plan"
-                : type === "MONTHLY"
-                    ? "Monthly Plan"
-                    : pkg?.product?.title || "Premium Plan";
+        const productId = String(pkg?.product?.productIdentifier || pkg?.identifier || "").toLowerCase();
 
+        // Support standard RC types AND product-id-based fallback
+        const isYearly = type === "ANNUAL" || type === "YEARLY"
+            || productId.includes("year") || productId.includes("annual");
+        const isMonthly = type === "MONTHLY"
+            || productId.includes("month");
 
-        const subtitle =
-            type === "ANNUAL" || type === "YEARLY"
-                ? "Best value for regular users"
-                : type === "MONTHLY"
-                    ? "Flexible monthly billing"
-                    : "Unlock premium features";
+        const title = isYearly
+            ? "Yearly Plan"
+            : isMonthly
+                ? "Monthly Plan"
+                : pkg?.product?.title || "Premium Plan";
 
+        const subtitle = isYearly
+            ? "Best value for regular users"
+            : isMonthly
+                ? "Flexible monthly billing"
+                : "Unlock premium features";
 
-        const badge =
-            type === "ANNUAL" || type === "YEARLY"
-                ? "Recommended"
-                : type === "MONTHLY"
-                    ? "Popular"
-                    : "Premium";
-
+        const badge = isYearly
+            ? "Recommended"
+            : isMonthly
+                ? "Popular"
+                : "Premium";
 
         return { title, subtitle, badge };
     };
@@ -124,11 +128,9 @@ export default function Premium() {
     const handlePurchase = async () => {
         if (!selectedPackage || isPurchasing) return;
 
-
         try {
             setIsPurchasing(true);
             setError("");
-
 
             const success = await purchaseSubscription(selectedPackage);
             if (success) {
@@ -148,11 +150,9 @@ export default function Premium() {
     const handleRestore = async () => {
         if (isRestoring) return;
 
-
         try {
             setIsRestoring(true);
             setError("");
-
 
             const restored = await restoreUserPurchases();
             if (restored) {
@@ -204,7 +204,6 @@ export default function Premium() {
                             </svg>
                         </button>
 
-
                         <div className="text-center">
                             <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
                                 Premium
@@ -212,11 +211,9 @@ export default function Premium() {
                             <div className="text-muted small">Remove ads and unlock a cleaner experience</div>
                         </div>
 
-
                         <div style={{ width: 42 }}></div>
                     </div>
                 </header>
-
 
                 <main
                     className="d-flex flex-column w-100"
@@ -250,7 +247,6 @@ export default function Premium() {
                                         </svg>
                                     </div>
 
-
                                     {isSubscribed && (
                                         <span
                                             className="badge rounded-pill px-3 py-2"
@@ -266,7 +262,6 @@ export default function Premium() {
                                     )}
                                 </div>
 
-
                                 <h3 className="fw-bold text-dark mb-2" style={{ letterSpacing: "-0.6px" }}>
                                     Enjoy Eazy Bill without ads
                                 </h3>
@@ -275,7 +270,6 @@ export default function Premium() {
                                 </p>
                             </div>
                         </div>
-
 
                         <div className="row g-3 mb-4">
                             <div className="col-12 col-md-4">
@@ -316,7 +310,6 @@ export default function Premium() {
                             </div>
                         </div>
 
-
                         <div className="mb-2 d-flex align-items-center justify-content-between">
                             <h6
                                 className="text-muted small fw-bold text-uppercase ms-2 mb-0"
@@ -325,7 +318,6 @@ export default function Premium() {
                                 Choose your plan
                             </h6>
                         </div>
-
 
                         {isLoading ? (
                             <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
@@ -344,7 +336,6 @@ export default function Premium() {
                                         pkg?.product?.priceString ||
                                         pkg?.product?.formattedPrice ||
                                         "Price unavailable";
-
 
                                     return (
                                         <button
@@ -373,7 +364,6 @@ export default function Premium() {
                                                     }}
                                                 />
 
-
                                                 <div className="flex-grow-1">
                                                     <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
                                                         <div className="fw-bold text-dark" style={{ fontSize: "1rem" }}>
@@ -393,15 +383,12 @@ export default function Premium() {
                                                         </span>
                                                     </div>
 
-
                                                     <div className="text-muted small mb-2">{meta.subtitle}</div>
-
 
                                                     <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
                                                         {priceText}
                                                     </div>
                                                 </div>
-
 
                                                 <svg
                                                     width="22"
@@ -420,7 +407,6 @@ export default function Premium() {
                             </div>
                         )}
 
-
                         {error && (
                             <div
                                 className="alert border-0 rounded-4 shadow-sm mb-4"
@@ -433,7 +419,6 @@ export default function Premium() {
                                 <div className="small mb-0">{error}</div>
                             </div>
                         )}
-
 
                         <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
                             <div className="p-3 p-sm-4">
@@ -463,7 +448,6 @@ export default function Premium() {
                                                 : "Select a Plan"}
                                 </button>
 
-
                                 <button
                                     type="button"
                                     onClick={handleRestore}
@@ -474,14 +458,12 @@ export default function Premium() {
                                     {isRestoring ? "Restoring Purchases..." : "Restore Purchases"}
                                 </button>
 
-
                                 <div className="text-center text-muted small mt-3" style={{ lineHeight: 1.6 }}>
                                     Your purchase will be handled securely through Google Play.
                                     Premium removes banner ads and interstitial ads from your Eazy Bill app experience.
                                 </div>
                             </div>
                         </div>
-
 
                         <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
                             <div className="p-3 p-sm-4">
@@ -504,7 +486,6 @@ export default function Premium() {
                                         </div>
                                     </div>
 
-
                                     <div className="d-flex align-items-start gap-3">
                                         <div
                                             className="rounded-3 d-flex align-items-center justify-content-center text-white"
@@ -520,7 +501,6 @@ export default function Premium() {
                                             <div className="text-muted small">Work smoothly without ad interruptions during billing and navigation.</div>
                                         </div>
                                     </div>
-
 
                                     <div className="d-flex align-items-start gap-3">
                                         <div
@@ -540,7 +520,6 @@ export default function Premium() {
                                 </div>
                             </div>
                         </div>
-
 
                         <div style={{ height: "110px", flexShrink: 0 }}></div>
                     </div>

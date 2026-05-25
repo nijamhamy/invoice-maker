@@ -788,7 +788,6 @@ export default function InvoiceCreate() {
                         className="mt-auto pt-3 flex-shrink-0"
                         style={{
                             paddingBottom: "12px",
-                            marginBottom: "32px",
                             marginBottom: "calc(45px + env(safe-area-inset-bottom, 0px))",
                         }}
                     >
