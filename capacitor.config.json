@@ -2,6 +2,7 @@
   "appId": "com.easybill.invoice.app",
   "appName": "Eazy Bill",
   "webDir": "dist",
+  "backgroundColor": "#ffffff",
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
@@ -13,13 +14,16 @@
       "androidSpinnerStyle": "large",
       "iosSpinnerStyle": "small",
       "spinnerColor": "#999999",
-      "splashFullScreen": true,
-      "splashImmersive": true
+      "splashFullScreen": false,
+      "splashImmersive": false
     },
     "StatusBar": {
       "overlaysWebView": false,
       "backgroundColor": "#ffffff",
-      "style": "DARK"
+      "style": "LIGHT"
+    },
+    "EdgeToEdge": {
+      "backgroundColor": "#ffffff"
     }
   },
   "android": {

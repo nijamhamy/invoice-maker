@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import BusinessProfileModal from "../settings/BusinessProfileModal.jsx";
 import CurrencyModal from "../settings/CurrencyModal.jsx";
 import PdfTemplateModal from "../settings/PdfTemplateModal.jsx";
@@ -33,17 +34,37 @@ export default function Settings() {
         ""
     );
 
+    const isDark = !!settingsData?.darkMode;
+
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fb",
+        surfaceBg: isDark ? "#1e1e1e" : "#ffffff",
+        surfaceSoft: isDark ? "#2a2a2a" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#111827",
+        textMuted: isDark ? "#a0a0a0" : "#6c757d",
+        border: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+        pressedBg: isDark ? "#2a2a2a" : "#f1f3f5",
+        shadow: isDark
+            ? "0 6px 20px rgba(0, 0, 0, 0.28)"
+            : "0 4px 14px rgba(0, 0, 0, 0.06)",
+    };
+
     useEffect(() => {
         const initStatusBar = async () => {
+            if (!Capacitor.isNativePlatform()) return;
+
             try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
+                await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+                await StatusBar.setBackgroundColor({
+                    color: isDark ? "#121212" : "#ffffff",
+                });
             } catch (e) {
                 console.warn("StatusBar plugin not available or running in web", e);
             }
         };
+
         initStatusBar();
-    }, []);
+    }, [isDark]);
 
     useEffect(() => {
         const fresh = getSettings();
@@ -106,32 +127,43 @@ export default function Settings() {
         }
     };
 
-    const SettingsItem = ({ icon, color, title, subtitle, onClick, isLast, rightContent }) => (
+    const SettingsItem = ({
+        icon,
+        color,
+        title,
+        subtitle,
+        onClick,
+        isLast,
+        rightContent,
+    }) => (
         <button
             type="button"
             onClick={onClick}
-            className={`w-100 border-0 bg-white d-flex align-items-center p-3 text-start ${!isLast ? "border-bottom" : ""}`}
+            className="w-100 border-0 d-flex align-items-center p-3 text-start"
             style={{
+                backgroundColor: colors.surfaceBg,
+                color: colors.textMain,
                 transition: "background-color 0.2s ease, transform 0.12s ease",
+                borderBottom: !isLast ? `1px solid ${colors.border}` : "none",
             }}
             onTouchStart={(e) => {
-                e.currentTarget.style.backgroundColor = "#f8f9fa";
+                e.currentTarget.style.backgroundColor = colors.pressedBg;
                 e.currentTarget.style.transform = "scale(0.995)";
             }}
             onTouchEnd={(e) => {
-                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.backgroundColor = colors.surfaceBg;
                 e.currentTarget.style.transform = "scale(1)";
             }}
             onMouseDown={(e) => {
-                e.currentTarget.style.backgroundColor = "#f8f9fa";
+                e.currentTarget.style.backgroundColor = colors.pressedBg;
                 e.currentTarget.style.transform = "scale(0.995)";
             }}
             onMouseUp={(e) => {
-                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.backgroundColor = colors.surfaceBg;
                 e.currentTarget.style.transform = "scale(1)";
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.backgroundColor = colors.surfaceBg;
                 e.currentTarget.style.transform = "scale(1)";
             }}
         >
@@ -149,22 +181,32 @@ export default function Settings() {
 
             <div className="flex-grow-1 overflow-hidden">
                 <div
-                    className="fw-bold text-dark text-truncate"
-                    style={{ fontSize: "0.96rem", letterSpacing: "-0.2px" }}
+                    className="fw-bold text-truncate"
+                    style={{
+                        fontSize: "0.96rem",
+                        letterSpacing: "-0.2px",
+                        color: colors.textMain,
+                    }}
                 >
                     {title}
                 </div>
                 {subtitle && (
                     <div
-                        className="text-muted small text-truncate"
-                        style={{ fontSize: "0.76rem" }}
+                        className="small text-truncate"
+                        style={{
+                            fontSize: "0.76rem",
+                            color: colors.textMuted,
+                        }}
                     >
                         {subtitle}
                     </div>
                 )}
             </div>
 
-            <div className="text-muted opacity-75 ms-2 d-flex align-items-center">
+            <div
+                className="opacity-75 ms-2 d-flex align-items-center"
+                style={{ color: colors.textMuted }}
+            >
                 {rightContent || (
                     <svg
                         width="20"
@@ -183,38 +225,60 @@ export default function Settings() {
 
     const SectionTitle = ({ children }) => (
         <h6
-            className="text-muted small fw-bold text-uppercase ms-2 mb-2"
-            style={{ letterSpacing: "0.6px" }}
+            className="small fw-bold text-uppercase ms-2 mb-2"
+            style={{
+                letterSpacing: "0.6px",
+                color: colors.textMuted,
+            }}
         >
             {children}
         </h6>
     );
 
+    const cardStyle = {
+        backgroundColor: colors.surfaceBg,
+        boxShadow: colors.shadow,
+        border: `1px solid ${colors.border}`,
+    };
+
     return (
         <div
-            className="d-flex flex-column w-100 h-100 bg-light"
-            style={{ overflow: "hidden" }}
+            className="d-flex flex-column w-100 h-100"
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{
+                overflow: "hidden",
+                backgroundColor: colors.pageBg,
+            }}
         >
             <div
                 className="d-flex flex-column mx-auto w-100 h-100 position-relative"
                 style={{
                     maxWidth: "768px",
-                    backgroundColor: "#f8f9fb",
+                    backgroundColor: colors.pageBg,
                     overflow: "hidden",
                 }}
             >
                 <header
-                    className="bg-white shadow-sm flex-shrink-0 z-3"
+                    className="flex-shrink-0 z-3"
                     style={{
                         paddingTop: "env(safe-area-inset-top)",
-                        borderBottom: "1px solid rgba(0,0,0,0.04)",
+                        borderBottom: `1px solid ${colors.border}`,
+                        backgroundColor: colors.surfaceBg,
+                        boxShadow: isDark
+                            ? "0 2px 10px rgba(0,0,0,0.24)"
+                            : "0 2px 10px rgba(0,0,0,0.04)",
                     }}
                 >
                     <div className="px-3 py-3 d-flex align-items-center justify-content-between">
                         <button
                             onClick={() => navigate(-1)}
-                            className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
-                            style={{ width: "42px", height: "42px" }}
+                            className="btn rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
+                            style={{
+                                width: "42px",
+                                height: "42px",
+                                backgroundColor: colors.surfaceSoft,
+                                color: colors.textMain,
+                            }}
                         >
                             <svg
                                 width="22"
@@ -229,10 +293,21 @@ export default function Settings() {
                         </button>
 
                         <div className="text-center">
-                            <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
+                            <h5
+                                className="m-0 fw-bold"
+                                style={{
+                                    letterSpacing: "-0.5px",
+                                    color: colors.textMain,
+                                }}
+                            >
                                 Settings
                             </h5>
-                            <div className="text-muted small">Manage app preferences</div>
+                            <div
+                                className="small"
+                                style={{ color: colors.textMuted }}
+                            >
+                                Manage app preferences
+                            </div>
                         </div>
 
                         <div style={{ width: 42 }}></div>
@@ -245,12 +320,12 @@ export default function Settings() {
                         flex: "1 1 0",
                         overflowY: "auto",
                         overflowX: "hidden",
-                        backgroundColor: "#f8f9fb",
+                        backgroundColor: colors.pageBg,
                     }}
                 >
                     <div className="container py-4">
                         <SectionTitle>Business</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Business Profile"
                                 subtitle="Logo, Name, Address, Contact"
@@ -288,7 +363,7 @@ export default function Settings() {
                         </div>
 
                         <SectionTitle>Data Management</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Backup & Restore"
                                 subtitle="Save data to Drive or Device"
@@ -304,7 +379,7 @@ export default function Settings() {
                         </div>
 
                         <SectionTitle>Premium</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Remove Ads"
                                 subtitle="Upgrade to premium for an ad-free experience"
@@ -320,7 +395,7 @@ export default function Settings() {
                         </div>
 
                         <SectionTitle>App Preferences</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Preferences"
                                 subtitle="Default discount, tax and invoice note"
@@ -352,15 +427,24 @@ export default function Settings() {
                             />
 
                             {showPreferences && (
-                                <div className="bg-white border-top p-3 p-sm-4">
+                                <div
+                                    className="border-top p-3 p-sm-4"
+                                    style={{
+                                        backgroundColor: colors.surfaceBg,
+                                        borderColor: colors.border,
+                                    }}
+                                >
                                     <div className="row g-3">
                                         <div className="col-12 col-sm-6">
-                                            <label className="form-label fw-bold text-dark small mb-2">
+                                            <label
+                                                className="form-label fw-bold small mb-2"
+                                                style={{ color: colors.textMain }}
+                                            >
                                                 Default Discount (%)
                                             </label>
                                             <input
                                                 type="number"
-                                                className="form-control bg-light border-0 fw-bold"
+                                                className="form-control border-0 fw-bold"
                                                 value={defaultDiscount}
                                                 min="0"
                                                 onChange={(e) => {
@@ -368,20 +452,27 @@ export default function Settings() {
                                                     setDefaultDiscount(value);
                                                     handleSavePreferences("discountRate", value);
                                                 }}
-                                                style={{ minHeight: "48px" }}
+                                                style={{
+                                                    minHeight: "48px",
+                                                    backgroundColor: colors.surfaceSoft,
+                                                    color: colors.textMain,
+                                                }}
                                             />
-                                            <div className="text-muted small mt-2">
+                                            <div className="small mt-2" style={{ color: colors.textMuted }}>
                                                 Auto applied on new invoices.
                                             </div>
                                         </div>
 
                                         <div className="col-12 col-sm-6">
-                                            <label className="form-label fw-bold text-dark small mb-2">
+                                            <label
+                                                className="form-label fw-bold small mb-2"
+                                                style={{ color: colors.textMain }}
+                                            >
                                                 Default Tax (%)
                                             </label>
                                             <input
                                                 type="number"
-                                                className="form-control bg-light border-0 fw-bold"
+                                                className="form-control border-0 fw-bold"
                                                 value={defaultTax}
                                                 min="0"
                                                 onChange={(e) => {
@@ -389,19 +480,26 @@ export default function Settings() {
                                                     setDefaultTax(value);
                                                     handleSavePreferences("taxRate", value);
                                                 }}
-                                                style={{ minHeight: "48px" }}
+                                                style={{
+                                                    minHeight: "48px",
+                                                    backgroundColor: colors.surfaceSoft,
+                                                    color: colors.textMain,
+                                                }}
                                             />
-                                            <div className="text-muted small mt-2">
+                                            <div className="small mt-2" style={{ color: colors.textMuted }}>
                                                 Used as the starting tax rate.
                                             </div>
                                         </div>
 
                                         <div className="col-12">
-                                            <label className="form-label fw-bold text-dark small mb-2">
+                                            <label
+                                                className="form-label fw-bold small mb-2"
+                                                style={{ color: colors.textMain }}
+                                            >
                                                 Default Invoice Text / Note
                                             </label>
                                             <textarea
-                                                className="form-control bg-light border-0"
+                                                className="form-control border-0"
                                                 rows="4"
                                                 placeholder="Enter default invoice note..."
                                                 value={defaultNote}
@@ -412,9 +510,11 @@ export default function Settings() {
                                                 style={{
                                                     resize: "none",
                                                     minHeight: "110px",
+                                                    backgroundColor: colors.surfaceSoft,
+                                                    color: colors.textMain,
                                                 }}
                                             />
-                                            <div className="text-muted small mt-2">
+                                            <div className="small mt-2" style={{ color: colors.textMuted }}>
                                                 This note will automatically appear in invoice pages.
                                             </div>
                                         </div>
@@ -423,21 +523,36 @@ export default function Settings() {
                                             <div
                                                 className="rounded-4 p-3"
                                                 style={{
-                                                    backgroundColor: "#f8f9fa",
-                                                    border: "1px solid rgba(0,0,0,0.04)",
+                                                    backgroundColor: colors.surfaceSoft,
+                                                    border: `1px solid ${colors.border}`,
                                                 }}
                                             >
-                                                <div className="fw-bold text-dark small mb-2">
+                                                <div
+                                                    className="fw-bold small mb-2"
+                                                    style={{ color: colors.textMain }}
+                                                >
                                                     Current Saved Defaults
                                                 </div>
-                                                <div className="text-muted small">
-                                                    Discount: <span className="fw-semibold text-dark">{settingsData?.discountRate ?? 0}%</span>
+                                                <div className="small" style={{ color: colors.textMuted }}>
+                                                    Discount:{" "}
+                                                    <span className="fw-semibold" style={{ color: colors.textMain }}>
+                                                        {settingsData?.discountRate ?? 0}%
+                                                    </span>
                                                 </div>
-                                                <div className="text-muted small">
-                                                    Tax: <span className="fw-semibold text-dark">{settingsData?.taxRate ?? 0}%</span>
+                                                <div className="small" style={{ color: colors.textMuted }}>
+                                                    Tax:{" "}
+                                                    <span className="fw-semibold" style={{ color: colors.textMain }}>
+                                                        {settingsData?.taxRate ?? 0}%
+                                                    </span>
                                                 </div>
-                                                <div className="text-muted small text-truncate">
-                                                    Note: <span className="fw-semibold text-dark">{settingsData?.defaultNote || settingsData?.defaultInvoiceNote || settingsData?.invoiceNote || "No default note"}</span>
+                                                <div className="small text-truncate" style={{ color: colors.textMuted }}>
+                                                    Note:{" "}
+                                                    <span className="fw-semibold" style={{ color: colors.textMain }}>
+                                                        {settingsData?.defaultNote ||
+                                                            settingsData?.defaultInvoiceNote ||
+                                                            settingsData?.invoiceNote ||
+                                                            "No default note"}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -447,7 +562,7 @@ export default function Settings() {
                         </div>
 
                         <SectionTitle>Appearance</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Dark Mode"
                                 subtitle="Theme and display settings"
@@ -463,7 +578,7 @@ export default function Settings() {
                         </div>
 
                         <SectionTitle>About & Support</SectionTitle>
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <SettingsItem
                                 title="Share with Friends"
                                 subtitle="Spread the word"
@@ -494,12 +609,20 @@ export default function Settings() {
                             />
                         </div>
 
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+                        <div className="card border-0 rounded-4 overflow-hidden mb-4" style={cardStyle}>
                             <div className="p-3 text-center">
-                                <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>
+                                <div
+                                    className="fw-bold"
+                                    style={{
+                                        fontSize: "0.95rem",
+                                        color: colors.textMain,
+                                    }}
+                                >
                                     Eazy Bill
                                 </div>
-                                <div className="text-muted small">Version 1.0.0</div>
+                                <div className="small" style={{ color: colors.textMuted }}>
+                                    Version 1.0.0
+                                </div>
                             </div>
                         </div>
 

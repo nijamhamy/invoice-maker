@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { getData, saveData } from "../utils/storage";
 import { getSettings } from "../utils/settings";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -15,19 +16,42 @@ export default function Home() {
     const [filter, setFilter] = useState("All");
     const [selectedIds, setSelectedIds] = useState([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isDark, setIsDark] = useState(false);
 
-    let pressTimer;
+    const pressTimerRef = useRef(null);
 
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({
+                        color: dark ? "#121212" : "#ffffff",
+                    });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
+
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
     }, []);
 
     useEffect(() => {
@@ -44,10 +68,12 @@ export default function Home() {
     }, [invoices, filter]);
 
     const handleTouchStart = (id) => {
-        pressTimer = setTimeout(() => enterSelectionMode(id), 600);
+        pressTimerRef.current = setTimeout(() => enterSelectionMode(id), 600);
     };
 
-    const handleTouchEnd = () => clearTimeout(pressTimer);
+    const handleTouchEnd = () => {
+        if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    };
 
     const enterSelectionMode = async (id) => {
         setIsSelectionMode(true);
@@ -107,18 +133,51 @@ export default function Home() {
         })}`;
     };
 
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fa",
+        shellBg: isDark ? "#121212" : "transparent",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        contentBg: isDark ? "#181818" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#212529",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        textSoft: isDark ? "#ced4da" : "#6c757d",
+        cardBg: isDark ? "#1e1e1e" : "#ffffff",
+        softBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        innerSoftBg: isDark ? "#252525" : "#ffffff",
+        border: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+        avatarBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        avatarBorder: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #fff",
+        selectionUnselectedBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        badgePaidBg: isDark ? "rgba(5,150,105,0.18)" : "#e1f9ec",
+        badgePaidText: isDark ? "#6ee7b7" : "#059669",
+        badgeUnpaidBg: isDark ? "rgba(220,38,38,0.18)" : "#fee2e2",
+        badgeUnpaidText: isDark ? "#fca5a5" : "#dc2626",
+        badgeOtherBg: isDark ? "rgba(217,119,6,0.18)" : "#fef3c7",
+        badgeOtherText: isDark ? "#fcd34d" : "#d97706",
+        fabShadow: isDark
+            ? "0 8px 24px rgba(13, 110, 253, 0.5)"
+            : "0 8px 24px rgba(13, 110, 253, 0.4)",
+        emptyIconBg: isDark ? "#1e1e1e" : "#ffffff",
+        emptyIconStroke: isDark ? "#868e96" : "#adb5bd",
+    };
+
     return (
         <div
-            className="d-flex flex-column w-100 h-100 bg-light"
-            style={{ overflow: "hidden" }}
+            className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{ overflow: "hidden", backgroundColor: colors.pageBg }}
         >
             <div
                 className="d-flex flex-column mx-auto w-100 h-100 position-relative"
-                style={{ maxWidth: "768px" }}
+                style={{ maxWidth: "768px", backgroundColor: colors.shellBg }}
             >
                 <header
-                    className="bg-white shadow-sm flex-shrink-0 z-3"
-                    style={{ paddingTop: "env(safe-area-inset-top)" }}
+                    className="shadow-sm flex-shrink-0 z-3"
+                    style={{
+                        paddingTop: "env(safe-area-inset-top)",
+                        backgroundColor: colors.headerBg,
+                    }}
                 >
                     {isSelectionMode ? (
                         <div className="d-flex align-items-center justify-content-between p-3 bg-primary text-white shadow-sm">
@@ -171,8 +230,12 @@ export default function Home() {
                         <div className="p-3 d-flex justify-content-between align-items-center">
                             <div>
                                 <h4
-                                    className="fw-bold m-0 text-dark"
-                                    style={{ letterSpacing: "-1px", fontSize: "1.55rem" }}
+                                    className="fw-bold m-0"
+                                    style={{
+                                        letterSpacing: "-1px",
+                                        fontSize: "1.55rem",
+                                        color: colors.textMain,
+                                    }}
                                 >
                                     My Invoices
                                 </h4>
@@ -181,19 +244,34 @@ export default function Home() {
                         </div>
                     )}
 
-                    <div className="px-3 pb-3 pt-1 bg-white">
-                        <div className="bg-light p-1 rounded-4 d-flex border shadow-sm gap-1">
+                    <div
+                        className="px-3 pb-3 pt-1"
+                        style={{ backgroundColor: colors.headerBg }}
+                    >
+                        <div
+                            className="p-1 rounded-4 d-flex shadow-sm gap-1"
+                            style={{
+                                backgroundColor: colors.softBg,
+                                border: `1px solid ${colors.border}`,
+                            }}
+                        >
                             {["All", "Paid", "Unpaid"].map((status) => (
                                 <button
                                     key={status}
-                                    className={`btn btn-sm flex-grow-1 rounded-4 border-0 fw-bold py-2 ${filter === status
-                                            ? "bg-white shadow-sm text-primary"
-                                            : "text-muted bg-transparent"
-                                        }`}
+                                    className="btn btn-sm flex-grow-1 rounded-4 border-0 fw-bold py-2"
                                     onClick={() => setFilter(status)}
                                     style={{
                                         fontSize: "0.85rem",
                                         minHeight: "40px",
+                                        backgroundColor:
+                                            filter === status ? colors.innerSoftBg : "transparent",
+                                        color: filter === status ? "#0d6efd" : colors.textMuted,
+                                        boxShadow:
+                                            filter === status
+                                                ? isDark
+                                                    ? "0 2px 8px rgba(0,0,0,0.25)"
+                                                    : "0 2px 8px rgba(0,0,0,0.08)"
+                                                : "none",
                                     }}
                                 >
                                     {status}
@@ -209,25 +287,33 @@ export default function Home() {
                         flex: "1 1 0",
                         overflowY: "auto",
                         overflowX: "hidden",
-                        backgroundColor: "#f8f9fa",
+                        backgroundColor: colors.contentBg,
                     }}
                 >
                     {filteredInvoices.length === 0 ? (
                         <div className="text-center py-5 mt-4">
-                            <div className="mb-4 d-inline-block p-4 rounded-circle bg-white shadow-sm border opacity-75">
+                            <div
+                                className="mb-4 d-inline-block p-4 rounded-circle shadow-sm border opacity-75"
+                                style={{
+                                    backgroundColor: colors.emptyIconBg,
+                                    borderColor: colors.border,
+                                }}
+                            >
                                 <svg
                                     width="60"
                                     height="60"
                                     fill="none"
-                                    stroke="#adb5bd"
+                                    stroke={colors.emptyIconStroke}
                                     strokeWidth="1"
                                     viewBox="0 0 24 24"
                                 >
                                     <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                             </div>
-                            <h5 className="fw-bold text-dark mb-1">No Invoices Found</h5>
-                            <p className="text-muted px-4 small">
+                            <h5 className="fw-bold mb-1" style={{ color: colors.textMain }}>
+                                No Invoices Found
+                            </h5>
+                            <p className="px-4 small" style={{ color: colors.textMuted }}>
                                 Tap the plus button below to create your first professional invoice.
                             </p>
                         </div>
@@ -236,11 +322,12 @@ export default function Home() {
                             {filteredInvoices.map((inv) => (
                                 <div
                                     key={inv.id}
-                                    className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white"
+                                    className="card border-0 shadow-sm rounded-4 overflow-hidden"
                                     onClick={() => handleItemClick(inv.id)}
                                     onTouchStart={() => handleTouchStart(inv.id)}
                                     onTouchEnd={handleTouchEnd}
                                     style={{
+                                        backgroundColor: colors.cardBg,
                                         border: selectedIds.includes(inv.id)
                                             ? "2px solid #0d6efd"
                                             : "2px solid transparent",
@@ -258,9 +345,19 @@ export default function Home() {
                                                     <div
                                                         className={`rounded-circle border d-flex align-items-center justify-content-center shadow-sm ${selectedIds.includes(inv.id)
                                                                 ? "bg-primary border-primary"
-                                                                : "bg-light"
+                                                                : ""
                                                             }`}
-                                                        style={{ width: 28, height: 28, minWidth: 28 }}
+                                                        style={{
+                                                            width: 28,
+                                                            height: 28,
+                                                            minWidth: 28,
+                                                            backgroundColor: selectedIds.includes(inv.id)
+                                                                ? "#0d6efd"
+                                                                : colors.selectionUnselectedBg,
+                                                            borderColor: selectedIds.includes(inv.id)
+                                                                ? "#0d6efd"
+                                                                : colors.border,
+                                                        }}
                                                     >
                                                         {selectedIds.includes(inv.id) && (
                                                             <svg
@@ -277,13 +374,14 @@ export default function Home() {
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center fw-bold shadow-sm"
+                                                        className="rounded-circle text-primary d-flex align-items-center justify-content-center fw-bold shadow-sm"
                                                         style={{
                                                             width: 48,
                                                             height: 48,
                                                             minWidth: 48,
                                                             fontSize: "1.1rem",
-                                                            border: "1px solid #fff",
+                                                            backgroundColor: colors.avatarBg,
+                                                            border: colors.avatarBorder,
                                                         }}
                                                     >
                                                         {inv.clientName?.charAt(0).toUpperCase() || "I"}
@@ -292,25 +390,30 @@ export default function Home() {
 
                                                 <div className="overflow-hidden flex-grow-1">
                                                     <h6
-                                                        className="fw-bold text-dark m-0 mb-1 text-truncate"
-                                                        style={{ fontSize: "1rem" }}
+                                                        className="fw-bold m-0 mb-1 text-truncate"
+                                                        style={{ fontSize: "1rem", color: colors.textMain }}
                                                     >
                                                         {inv.clientName}
                                                     </h6>
 
                                                     <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                                                         <span
-                                                            className="bg-light px-2 rounded-2 text-primary fw-bold text-truncate"
+                                                            className="px-2 rounded-2 fw-bold text-truncate"
                                                             style={{
                                                                 fontSize: "0.7rem",
                                                                 maxWidth: "120px",
+                                                                backgroundColor: colors.softBg,
+                                                                color: "#0d6efd",
                                                             }}
                                                         >
                                                             {inv.invoiceNo}
                                                         </span>
                                                         <span
-                                                            className="text-muted opacity-75 text-truncate"
-                                                            style={{ fontSize: "0.75rem" }}
+                                                            className="opacity-75 text-truncate"
+                                                            style={{
+                                                                fontSize: "0.75rem",
+                                                                color: colors.textMuted,
+                                                            }}
                                                         >
                                                             {inv.issueDate}
                                                         </span>
@@ -323,10 +426,11 @@ export default function Home() {
                                                 style={{ minWidth: "115px" }}
                                             >
                                                 <h6
-                                                    className="fw-bold m-0 mb-1 text-dark text-nowrap"
+                                                    className="fw-bold m-0 mb-1 text-nowrap"
                                                     style={{
                                                         fontSize: "0.96rem",
                                                         whiteSpace: "nowrap",
+                                                        color: colors.textMain,
                                                     }}
                                                 >
                                                     {formatAmount(inv.total)}
@@ -338,16 +442,16 @@ export default function Home() {
                                                         fontSize: "0.65rem",
                                                         backgroundColor:
                                                             inv.paymentStatus === "Paid"
-                                                                ? "#e1f9ec"
+                                                                ? colors.badgePaidBg
                                                                 : inv.paymentStatus === "Unpaid"
-                                                                    ? "#fee2e2"
-                                                                    : "#fef3c7",
+                                                                    ? colors.badgeUnpaidBg
+                                                                    : colors.badgeOtherBg,
                                                         color:
                                                             inv.paymentStatus === "Paid"
-                                                                ? "#059669"
+                                                                ? colors.badgePaidText
                                                                 : inv.paymentStatus === "Unpaid"
-                                                                    ? "#dc2626"
-                                                                    : "#d97706",
+                                                                    ? colors.badgeUnpaidText
+                                                                    : colors.badgeOtherText,
                                                     }}
                                                 >
                                                     {inv.paymentStatus?.toUpperCase() || "UNPAID"}
@@ -374,7 +478,7 @@ export default function Home() {
                             height: "60px",
                             zIndex: 1050,
                             border: "none",
-                            boxShadow: "0 8px 24px rgba(13, 110, 253, 0.4)",
+                            boxShadow: colors.fabShadow,
                         }}
                         onClick={() => navigate("/invoice/new")}
                     >

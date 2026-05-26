@@ -1,35 +1,30 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
-
 
 // Advanced Native Plugins
 import { Dialog } from "@capacitor/dialog";
 import { Toast } from "@capacitor/toast";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
-
 // Utils & Store
 import { getSettings } from "../utils/settings";
 import { useItemStore } from "../store/useItemStore";
-
 
 export default function Items() {
     const navigate = useNavigate();
     const location = useLocation();
 
-
     const settings = getSettings();
     const currency = settings.currency || { code: "INR", symbol: "₹" };
 
-
     const { items, addItem, updateItem, deleteItem: removeItemStore } = useItemStore();
-
 
     const [showForm, setShowForm] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-
+    const [isDark, setIsDark] = useState(false);
 
     const [item, setItem] = useState({
         id: null,
@@ -40,7 +35,6 @@ export default function Items() {
         unit: "",
     });
 
-
     const formatAmount = (value) => {
         const amount = Number(value || 0);
         const formatted = new Intl.NumberFormat("en-IN", {
@@ -48,23 +42,42 @@ export default function Items() {
             maximumFractionDigits: 2,
         }).format(amount);
 
-
         return `${currency.symbol} ${formatted}`;
     };
 
-
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({
+                        color: dark ? "#121212" : "#ffffff",
+                    });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
-    }, []);
 
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
+    }, []);
 
     useEffect(() => {
         const backButtonHandler = CapacitorApp.addListener("backButton", () => {
@@ -75,17 +88,14 @@ export default function Items() {
             }
         });
 
-
         return () => {
             backButtonHandler.then((h) => h.remove());
         };
     }, [showForm, navigate]);
 
-
     useEffect(() => {
         if (location.state?.openCreate) openAddForm();
     }, [location.state]);
-
 
     const handleItemClick = async (targetItem) => {
         try {
@@ -94,12 +104,10 @@ export default function Items() {
         openEditForm(targetItem);
     };
 
-
     const openAddForm = async () => {
         try {
             await Haptics.impact({ style: ImpactStyle.Light });
         } catch (e) { }
-
 
         setItem({
             id: null,
@@ -113,28 +121,23 @@ export default function Items() {
         setSearchTerm("");
     };
 
-
     const openEditForm = (targetItem) => {
         setItem({ ...targetItem });
         setShowForm(true);
         setSearchTerm("");
     };
 
-
     const saveItem = async () => {
         try {
             await Haptics.impact({ style: ImpactStyle.Medium });
         } catch (e) { }
-
 
         if (!item.name.trim() || !item.price.toString().trim()) {
             await Toast.show({ text: "Name and Price are required!" });
             return;
         }
 
-
         const formattedItem = { ...item, price: Number(item.price) };
-
 
         if (item.id) {
             updateItem(formattedItem);
@@ -142,9 +145,7 @@ export default function Items() {
             addItem(formattedItem);
         }
 
-
         await Toast.show({ text: "Product saved successfully!" });
-
 
         if (location.state?.returnToInvoice) {
             navigate(-1);
@@ -153,15 +154,12 @@ export default function Items() {
         }
     };
 
-
     const deleteSingleItem = async (e, id) => {
         e.stopPropagation();
-
 
         try {
             await Haptics.impact({ style: ImpactStyle.Heavy });
         } catch (e) { }
-
 
         const { value } = await Dialog.confirm({
             title: "Delete Product",
@@ -170,13 +168,11 @@ export default function Items() {
             cancelButtonTitle: "Cancel",
         });
 
-
         if (value) {
             removeItemStore(id);
             await Toast.show({ text: "Product deleted" });
         }
     };
-
 
     const filteredItems = items.filter(
         (i) =>
@@ -184,7 +180,6 @@ export default function Items() {
             (i.serialNo &&
                 String(i.serialNo).toLowerCase().includes(searchTerm.toLowerCase()))
     );
-
 
     const handleBack = () => {
         if (showForm) {
@@ -195,29 +190,68 @@ export default function Items() {
         }
     };
 
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fb",
+        shellBg: isDark ? "#121212" : "#ffffff",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        formBg: isDark ? "#121212" : "#fdfdfd",
+        listBg: isDark ? "#181818" : "#f8f9fa",
+        cardBg: isDark ? "#1e1e1e" : "#ffffff",
+        softBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#212529",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        textSecondary: isDark ? "#ced4da" : "#6c757d",
+        border: isDark ? "rgba(255,255,255,0.12)" : "#dee2e6",
+        lightBorder: isDark ? "rgba(255,255,255,0.08)" : "#ffffff",
+        inputBg: isDark ? "#1e1e1e" : "transparent",
+        inputBorder: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #dee2e6",
+        searchBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        searchText: isDark ? "#ffffff" : "#212529",
+        emptyIconBg: isDark ? "#1e1e1e" : "#ffffff",
+        emptyIconStroke: isDark ? "#868e96" : "#adb5bd",
+        avatarBg: isDark ? "rgba(13,110,253,0.18)" : "",
+        avatarBorder: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #fff",
+        fabShadow: isDark
+            ? "0 8px 24px rgba(13, 110, 253, 0.5)"
+            : "0 8px 24px rgba(13, 110, 253, 0.4)",
+        btnLightBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        btnLightText: isDark ? "#ffffff" : "#212529",
+    };
 
     return (
         <div
-            className="d-flex flex-column w-100 h-100 bg-light"
-            style={{ overflow: "hidden" }}
+            className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{ overflow: "hidden", backgroundColor: colors.pageBg }}
         >
             <div
-                className="d-flex flex-column mx-auto w-100 h-100 position-relative bg-white shadow-sm"
-                style={{ maxWidth: "768px" }}
+                className="d-flex flex-column mx-auto w-100 h-100 position-relative shadow-sm"
+                style={{
+                    maxWidth: "768px",
+                    backgroundColor: colors.shellBg,
+                }}
             >
                 {showForm ? (
                     <>
-                        {/* FORM HEADER */}
-                        <header className="bg-white border-bottom flex-shrink-0 z-3">
+                        <header
+                            className="border-bottom flex-shrink-0 z-3"
+                            style={{
+                                backgroundColor: colors.headerBg,
+                                borderColor: colors.border,
+                            }}
+                        >
                             <div
                                 style={{
                                     height: "env(safe-area-inset-top, 0px)",
-                                    backgroundColor: "#ffffff",
+                                    backgroundColor: colors.headerBg,
                                 }}
                             ></div>
 
-
-                            <div className="p-3 d-flex align-items-center justify-content-between bg-white">
+                            <div
+                                className="p-3 d-flex align-items-center justify-content-between"
+                                style={{ backgroundColor: colors.headerBg }}
+                            >
                                 <button
                                     onClick={handleBack}
                                     className="btn btn-link text-danger text-decoration-none fw-medium p-0"
@@ -226,11 +260,12 @@ export default function Items() {
                                     Cancel
                                 </button>
 
-
-                                <h6 className="m-0 fw-bold" style={{ letterSpacing: "-0.5px" }}>
+                                <h6
+                                    className="m-0 fw-bold"
+                                    style={{ letterSpacing: "-0.5px", color: colors.textMain }}
+                                >
                                     {item.id ? "Edit Product" : "New Product"}
                                 </h6>
-
 
                                 <button
                                     onClick={saveItem}
@@ -242,23 +277,26 @@ export default function Items() {
                             </div>
                         </header>
 
-
                         <main
                             className="p-4 d-flex flex-column w-100"
                             style={{
                                 flex: "1 1 0",
                                 overflowY: "auto",
                                 overflowX: "hidden",
-                                backgroundColor: "#fdfdfd",
+                                backgroundColor: colors.formBg,
                             }}
                         >
                             <div
-                                className="bg-light p-3 rounded-4 border border-light shadow-sm mb-4 mx-auto w-100"
-                                style={{ maxWidth: "600px" }}
+                                className="p-3 rounded-4 shadow-sm mb-4 mx-auto w-100"
+                                style={{
+                                    maxWidth: "600px",
+                                    backgroundColor: colors.softBg,
+                                    border: `1px solid ${colors.lightBorder}`,
+                                }}
                             >
                                 <div className="form-floating mb-3">
                                     <input
-                                        className="form-control border-0 bg-transparent fw-bold text-secondary"
+                                        className="form-control border-0 fw-bold"
                                         name="serialNo"
                                         value={item.serialNo}
                                         onChange={(e) =>
@@ -266,17 +304,20 @@ export default function Items() {
                                         }
                                         placeholder="Serial"
                                         style={{
-                                            borderBottom: "1px solid #dee2e6",
+                                            borderBottom: colors.inputBorder,
                                             borderRadius: 0,
+                                            backgroundColor: colors.inputBg,
+                                            color: colors.textSecondary,
                                         }}
                                     />
-                                    <label>Serial Number (Optional)</label>
+                                    <label style={{ color: colors.textMuted }}>
+                                        Serial Number (Optional)
+                                    </label>
                                 </div>
-
 
                                 <div className="form-floating mb-3">
                                     <input
-                                        className="form-control border-0 bg-transparent fw-bold"
+                                        className="form-control border-0 fw-bold"
                                         name="name"
                                         value={item.name}
                                         onChange={(e) =>
@@ -285,24 +326,36 @@ export default function Items() {
                                         placeholder="Name"
                                         autoFocus
                                         style={{
-                                            borderBottom: "1px solid #dee2e6",
+                                            borderBottom: colors.inputBorder,
                                             borderRadius: 0,
                                             fontSize: "1.1rem",
+                                            backgroundColor: colors.inputBg,
+                                            color: colors.textMain,
                                         }}
                                     />
-                                    <label>Product / Item Name</label>
+                                    <label style={{ color: colors.textMuted }}>
+                                        Product / Item Name
+                                    </label>
                                 </div>
 
-
-                                <div className="row g-0 mb-3 border-bottom pb-2">
-                                    <div className="col-7 border-end">
+                                <div
+                                    className="row g-0 mb-3 border-bottom pb-2"
+                                    style={{ borderColor: colors.border }}
+                                >
+                                    <div
+                                        className="col-7 border-end"
+                                        style={{ borderColor: colors.border }}
+                                    >
                                         <div className="form-floating position-relative">
-                                            <span className="position-absolute top-50 start-0 translate-middle-y ms-3 text-muted fw-bold">
+                                            <span
+                                                className="position-absolute top-50 start-0 translate-middle-y ms-3 fw-bold"
+                                                style={{ color: colors.textMuted }}
+                                            >
                                                 {currency.symbol}
                                             </span>
                                             <input
                                                 type="number"
-                                                className="form-control border-0 bg-transparent fw-bold text-success ps-5"
+                                                className="form-control border-0 fw-bold text-success ps-5"
                                                 name="price"
                                                 value={item.price}
                                                 onChange={(e) =>
@@ -312,67 +365,89 @@ export default function Items() {
                                                 style={{
                                                     borderRadius: 0,
                                                     fontSize: "1.2rem",
+                                                    backgroundColor: colors.inputBg,
                                                 }}
                                             />
-                                            <label className="ps-5">Price</label>
+                                            <label className="ps-5" style={{ color: colors.textMuted }}>
+                                                Price
+                                            </label>
                                         </div>
                                     </div>
-
 
                                     <div className="col-5">
                                         <div className="form-floating">
                                             <input
-                                                className="form-control border-0 bg-transparent"
+                                                className="form-control border-0"
                                                 name="unit"
                                                 value={item.unit}
                                                 onChange={(e) =>
                                                     setItem({ ...item, unit: e.target.value })
                                                 }
                                                 placeholder="Unit"
-                                                style={{ borderRadius: 0 }}
+                                                style={{
+                                                    borderRadius: 0,
+                                                    backgroundColor: colors.inputBg,
+                                                    color: colors.textMain,
+                                                }}
                                             />
-                                            <label className="ps-3">Unit (e.g. Kg)</label>
+                                            <label className="ps-3" style={{ color: colors.textMuted }}>
+                                                Unit (e.g. Kg)
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
 
-
                                 <div className="form-floating">
                                     <textarea
-                                        className="form-control border-0 bg-transparent"
+                                        className="form-control border-0"
                                         name="description"
                                         placeholder="Description"
-                                        style={{ height: "80px", borderRadius: 0 }}
+                                        style={{
+                                            height: "80px",
+                                            borderRadius: 0,
+                                            backgroundColor: colors.inputBg,
+                                            color: colors.textMain,
+                                        }}
                                         value={item.description || ""}
                                         onChange={(e) =>
                                             setItem({ ...item, description: e.target.value })
                                         }
                                     />
-                                    <label>Description (Optional)</label>
+                                    <label style={{ color: colors.textMuted }}>
+                                        Description (Optional)
+                                    </label>
                                 </div>
                             </div>
 
-
-                            <p className="text-center text-muted small px-4">
+                            <p
+                                className="text-center small px-4"
+                                style={{ color: colors.textMuted }}
+                            >
                                 Ensure the price and unit are correct for accurate billing.
                             </p>
-
 
                             <div style={{ height: "100px", flexShrink: 0 }}></div>
                         </main>
                     </>
                 ) : (
                     <>
-                        {/* INVENTORY LIST HEADER */}
                         <header
-                            className="bg-white shadow-sm flex-shrink-0 z-3"
-                            style={{ paddingTop: "env(safe-area-inset-top)" }}
+                            className="shadow-sm flex-shrink-0 z-3"
+                            style={{
+                                paddingTop: "env(safe-area-inset-top)",
+                                backgroundColor: colors.headerBg,
+                            }}
                         >
                             <div className="px-3 py-3 d-flex align-items-center justify-content-between">
                                 <button
                                     onClick={() => navigate(-1)}
-                                    className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
-                                    style={{ width: "42px", height: "42px" }}
+                                    className="btn rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
+                                    style={{
+                                        width: "42px",
+                                        height: "42px",
+                                        backgroundColor: colors.btnLightBg,
+                                        color: colors.btnLightText,
+                                    }}
                                 >
                                     <svg
                                         width="20"
@@ -386,20 +461,20 @@ export default function Items() {
                                     </svg>
                                 </button>
 
-
                                 <div className="text-center">
-                                    <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
+                                    <h5
+                                        className="m-0 fw-bold"
+                                        style={{ letterSpacing: "-0.5px", color: colors.textMain }}
+                                    >
                                         Inventory
                                     </h5>
-                                    <div className="text-muted small">
+                                    <div className="small" style={{ color: colors.textMuted }}>
                                         {items.length} total inventor{items.length !== 1 ? "ies" : "y"}
                                     </div>
                                 </div>
 
-
                                 <div style={{ width: "42px" }}></div>
                             </div>
-
 
                             <div className="px-3 pb-3">
                                 <div className="position-relative mx-auto" style={{ maxWidth: "600px" }}>
@@ -417,16 +492,20 @@ export default function Items() {
                                     </div>
                                     <input
                                         type="text"
-                                        className="form-control border-0 rounded-4 ps-5 shadow-sm bg-light"
+                                        className="form-control border-0 rounded-4 ps-5 shadow-sm"
                                         placeholder="Search by name or serial..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        style={{ height: "48px", fontSize: "0.95rem" }}
+                                        style={{
+                                            height: "48px",
+                                            fontSize: "0.95rem",
+                                            backgroundColor: colors.searchBg,
+                                            color: colors.searchText,
+                                        }}
                                     />
                                 </div>
                             </div>
                         </header>
-
 
                         <main
                             className="p-3 d-flex flex-column w-100"
@@ -434,25 +513,33 @@ export default function Items() {
                                 flex: "1 1 0",
                                 overflowY: "auto",
                                 overflowX: "hidden",
-                                backgroundColor: "#f8f9fa",
+                                backgroundColor: colors.listBg,
                             }}
                         >
                             {items.length === 0 ? (
                                 <div className="text-center py-5 mt-5">
-                                    <div className="mb-4 d-inline-block p-4 rounded-circle bg-white shadow-sm border opacity-75">
+                                    <div
+                                        className="mb-4 d-inline-block p-4 rounded-circle shadow-sm border opacity-75"
+                                        style={{
+                                            backgroundColor: colors.emptyIconBg,
+                                            borderColor: colors.border,
+                                        }}
+                                    >
                                         <svg
                                             width="64"
                                             height="64"
                                             fill="none"
-                                            stroke="#adb5bd"
+                                            stroke={colors.emptyIconStroke}
                                             strokeWidth="1"
                                             viewBox="0 0 24 24"
                                         >
                                             <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                         </svg>
                                     </div>
-                                    <h6 className="fw-bold text-dark mb-1">Your Inventory is Empty</h6>
-                                    <p className="text-muted px-5 small">
+                                    <h6 className="fw-bold mb-1" style={{ color: colors.textMain }}>
+                                        Your Inventory is Empty
+                                    </h6>
+                                    <p className="px-5 small" style={{ color: colors.textMuted }}>
                                         Tap the plus button below to add products and start managing your stock.
                                     </p>
                                 </div>
@@ -461,11 +548,12 @@ export default function Items() {
                                     {filteredItems.map((i) => (
                                         <div key={i.id} className="col-12 col-md-6">
                                             <div
-                                                className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white h-100"
+                                                className="card border-0 shadow-sm rounded-4 overflow-hidden h-100"
                                                 onClick={() => handleItemClick(i)}
                                                 style={{
                                                     cursor: "pointer",
                                                     transition: "transform 0.1s",
+                                                    backgroundColor: colors.cardBg,
                                                 }}
                                             >
                                                 <div
@@ -479,30 +567,33 @@ export default function Items() {
                                                             width: "52px",
                                                             height: "52px",
                                                             fontSize: "1rem",
-                                                            border: "1px solid #fff",
+                                                            border: colors.avatarBorder,
                                                             flexShrink: 0,
                                                         }}
                                                     >
                                                         {i.name ? i.name.charAt(0).toUpperCase() : "#"}
                                                     </div>
 
-
                                                     <div
                                                         className="flex-grow-1 overflow-hidden"
                                                         style={{ minWidth: 0 }}
                                                     >
                                                         <h6
-                                                            className="fw-bold text-dark mb-1 text-truncate"
-                                                            style={{ fontSize: "1.05rem" }}
+                                                            className="fw-bold mb-1 text-truncate"
+                                                            style={{
+                                                                fontSize: "1.05rem",
+                                                                color: colors.textMain,
+                                                            }}
                                                         >
                                                             {i.name}
                                                         </h6>
 
-
-                                                        <div className="text-muted small text-truncate mb-1">
+                                                        <div
+                                                            className="small text-truncate mb-1"
+                                                            style={{ color: colors.textMuted }}
+                                                        >
                                                             {i.serialNo ? `SN: ${i.serialNo}` : "No serial number"}
                                                         </div>
-
 
                                                         <div
                                                             className="d-flex align-items-baseline gap-1 flex-nowrap overflow-hidden"
@@ -518,13 +609,13 @@ export default function Items() {
                                                                 {formatAmount(i.price)}
                                                             </span>
 
-
                                                             {i.unit && (
                                                                 <span
-                                                                    className="text-muted small text-nowrap"
+                                                                    className="small text-nowrap"
                                                                     style={{
                                                                         fontSize: "0.82rem",
                                                                         fontWeight: 600,
+                                                                        color: colors.textMuted,
                                                                     }}
                                                                 >
                                                                     / {i.unit}
@@ -532,14 +623,15 @@ export default function Items() {
                                                             )}
                                                         </div>
 
-
                                                         {i.description && (
-                                                            <div className="text-muted small text-truncate mt-1">
+                                                            <div
+                                                                className="small text-truncate mt-1"
+                                                                style={{ color: colors.textMuted }}
+                                                            >
                                                                 {i.description}
                                                             </div>
                                                         )}
                                                     </div>
-
 
                                                     <button
                                                         onClick={(e) => deleteSingleItem(e, i.id)}
@@ -564,10 +656,8 @@ export default function Items() {
                                 </div>
                             )}
 
-
                             <div style={{ height: "130px", flexShrink: 0 }}></div>
                         </main>
-
 
                         <button
                             className="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center"
@@ -579,7 +669,7 @@ export default function Items() {
                                 height: "60px",
                                 zIndex: 1050,
                                 border: "none",
-                                boxShadow: "0 8px 24px rgba(13, 110, 253, 0.4)",
+                                boxShadow: colors.fabShadow,
                             }}
                             onClick={openAddForm}
                         >

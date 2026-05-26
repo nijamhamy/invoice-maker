@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 
 // Capacitor Native Plugins
 import { App as CapacitorApp } from "@capacitor/app";
@@ -47,6 +48,7 @@ export default function InvoiceCreate() {
     const [showClientPopup, setShowClientPopup] = useState(false);
     const [itemSearch, setItemSearch] = useState("");
     const [clientSearch, setClientSearch] = useState("");
+    const [isDark, setIsDark] = useState(false);
 
     const [invoiceNo, setInvoiceNo] = useState("");
     const [issueDate, setIssueDate] = useState("");
@@ -70,6 +72,24 @@ export default function InvoiceCreate() {
     const selectedClient = useMemo(() => {
         return getSelectedClientData(clients, clientId);
     }, [clientId, clients]);
+
+    const colors = {
+        appBg: isDark ? "#121212" : "#f8f9fa",
+        shellBg: isDark ? "#121212" : "#ffffff",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        sectionBg: isDark ? "#1e1e1e" : "#ffffff",
+        softBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        inputBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        popupBg: isDark ? "#1e1e1e" : "#ffffff",
+        popupBodyBg: isDark ? "#181818" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#212529",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        textLabel: isDark ? "#ced4da" : "#495057",
+        border: isDark ? "rgba(255,255,255,0.1)" : "#f8f9fa",
+        normalBorder: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+        lightBtnBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        backdrop: isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)",
+    };
 
     // ─── AdMob: Initialize & Preload on mount ────────────────────────────────
     useEffect(() => {
@@ -129,7 +149,6 @@ export default function InvoiceCreate() {
             });
             adListenersRef.current = [];
 
-            // Loaded listener
             const loadedListener = await AdMob.addListener(
                 InterstitialAdPluginEvents.Loaded,
                 () => {
@@ -138,7 +157,6 @@ export default function InvoiceCreate() {
             );
             adListenersRef.current.push(loadedListener);
 
-            // Dismissed listener — navigate after ad closes
             const dismissedListener = await AdMob.addListener(
                 InterstitialAdPluginEvents.Dismissed,
                 () => {
@@ -148,13 +166,11 @@ export default function InvoiceCreate() {
                         pendingNavigateRef.current = null;
                         navigate(path, { replace: true });
                     }
-                    // Preload next ad
                     prepareInterstitial();
                 }
             );
             adListenersRef.current.push(dismissedListener);
 
-            // Failed to load listener
             const failedListener = await AdMob.addListener(
                 InterstitialAdPluginEvents.FailedToLoad,
                 () => {
@@ -163,7 +179,6 @@ export default function InvoiceCreate() {
             );
             adListenersRef.current.push(failedListener);
 
-            // Failed to show listener — fallback navigate
             const failedShowListener = await AdMob.addListener(
                 InterstitialAdPluginEvents.FailedToShow,
                 () => {
@@ -213,15 +228,36 @@ export default function InvoiceCreate() {
     };
 
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+            document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({ color: dark ? "#121212" : "#ffffff" });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
+
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
     }, []);
 
     useEffect(() => {
@@ -274,7 +310,6 @@ export default function InvoiceCreate() {
 
         if (isEditMode) {
             const existing = invoices.find((inv) => inv.id === id);
-
             if (existing) {
                 setInvoiceNo(existing.invoiceNo);
                 setIssueDate(existing.issueDate);
@@ -366,7 +401,6 @@ export default function InvoiceCreate() {
 
         setIsSaving(true);
 
-        // Object Bracket { } சேர்த்து பழையபடியே அனுப்பவும்!
         const payloadData = buildInvoicePayload({
             id,
             isEditMode,
@@ -375,7 +409,7 @@ export default function InvoiceCreate() {
             invoiceNo,
             issueDate,
             dueDate,
-            items: invoiceItems, // <--- இது முக்கியம்
+            items: invoiceItems,
             paymentMethod,
             paymentStatus,
             comment,
@@ -383,7 +417,6 @@ export default function InvoiceCreate() {
             taxRate
         });
 
-        // Add notes for PDF compatibility
         const invoiceData = {
             ...payloadData,
             notes: comment
@@ -425,8 +458,6 @@ export default function InvoiceCreate() {
         }
 
         setIsSaving(false);
-
-        // Show interstitial ad if internet is on, then navigate; else navigate directly
         await showAdOrNavigate(`/invoice/preview/${invoiceData.id}`);
     };
 
@@ -444,26 +475,44 @@ export default function InvoiceCreate() {
     );
 
     return (
-        <div className="d-flex flex-column w-100 h-100"
-            style={{ overflow: 'hidden' }}>
-            <div className="d-flex flex-column mx-auto w-100 h-100 position-relative"
-                style={{ maxWidth: '768px', backgroundColor: '#ffffff' }}>
+        <div
+            className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{
+                overflow: "hidden",
+                backgroundColor: colors.appBg,
+                color: colors.textMain,
+            }}
+        >
+            <div
+                className="d-flex flex-column mx-auto w-100 h-100 position-relative"
+                style={{ maxWidth: "768px", backgroundColor: colors.shellBg }}
+            >
                 <header
-                    className="bg-white shadow-sm flex-shrink-0 z-3"
-                    style={{ paddingTop: "env(safe-area-inset-top)" }}
+                    className="shadow-sm flex-shrink-0 z-3"
+                    style={{
+                        paddingTop: "env(safe-area-inset-top)",
+                        backgroundColor: colors.headerBg,
+                    }}
                 >
                     <div className="p-3 d-flex align-items-center justify-content-between">
                         <button
                             onClick={() => navigate(-1)}
-                            className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center"
-                            style={{ width: "40px", height: "40px" }}
+                            className="btn rounded-circle border-0 d-flex align-items-center justify-content-center"
+                            style={{
+                                width: "40px",
+                                height: "40px",
+                                backgroundColor: colors.lightBtnBg,
+                                color: colors.textMain,
+                            }}
                         >
                             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                 <path d="M15 18l-6-6 6-6" />
                             </svg>
                         </button>
 
-                        <h6 className="m-0 fw-bold text-dark">
+                        <h6 className="m-0 fw-bold" style={{ color: colors.textMain }}>
                             {isEditMode ? "Edit Invoice" : "Create Invoice"}
                         </h6>
 
@@ -478,15 +527,28 @@ export default function InvoiceCreate() {
                         overflowY: "auto",
                         overflowX: "hidden",
                         paddingBottom: "180px",
+                        backgroundColor: colors.appBg,
                     }}
                 >
-                    <div className="mb-4 d-flex align-items-center justify-content-center gap-3 bg-white p-3 rounded-4 shadow-sm border border-light flex-shrink-0">
+                    <div
+                        className="mb-4 d-flex align-items-center justify-content-center gap-3 p-3 rounded-4 shadow-sm border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         {profile.logo ? (
                             <img
                                 src={profile.logo}
                                 alt="Logo"
-                                className="rounded-3 border p-1 bg-white"
-                                style={{ width: "60px", height: "60px", objectFit: "contain" }}
+                                className="rounded-3 border p-1"
+                                style={{
+                                    width: "60px",
+                                    height: "60px",
+                                    objectFit: "contain",
+                                    backgroundColor: "#ffffff",
+                                    borderColor: colors.normalBorder,
+                                }}
                             />
                         ) : (
                             <div
@@ -497,16 +559,22 @@ export default function InvoiceCreate() {
                             </div>
                         )}
                         <div className="text-start">
-                            <h6 className="fw-bold m-0 text-dark">
+                            <h6 className="fw-bold m-0" style={{ color: colors.textMain }}>
                                 {profile.businessName || "Your Business"}
                             </h6>
-                            <p className="text-muted small m-0 opacity-75">
+                            <p className="small m-0 opacity-75" style={{ color: colors.textMuted }}>
                                 {profile.phone || "Add details in settings"}
                             </p>
                         </div>
                     </div>
 
-                    <div className="bg-white p-3 rounded-4 shadow-sm mb-3 border border-light flex-shrink-0">
+                    <div
+                        className="p-3 rounded-4 shadow-sm mb-3 border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         <div
                             className="bg-primary px-3 py-1 rounded-pill d-inline-block text-white small fw-bold text-uppercase mb-3"
                             style={{ fontSize: "0.65rem" }}
@@ -517,37 +585,55 @@ export default function InvoiceCreate() {
                         <div className="form-floating mb-3">
                             <input
                                 type="text"
-                                className="form-control bg-light border-0 fw-bold"
+                                className="form-control border-0 fw-bold"
                                 value={invoiceNo}
                                 onChange={(e) => setInvoiceNo(e.target.value)}
+                                style={{
+                                    backgroundColor: colors.inputBg,
+                                    color: colors.textMain,
+                                }}
                             />
-                            <label>Invoice ID</label>
+                            <label style={{ color: colors.textLabel }}>Invoice ID</label>
                         </div>
 
                         <div className="row g-2">
                             <div className="col-6 form-floating">
                                 <input
                                     type="date"
-                                    className="form-control bg-light border-0 fw-medium"
+                                    className="form-control border-0 fw-medium"
                                     value={issueDate}
                                     onChange={(e) => setIssueDate(e.target.value)}
+                                    style={{
+                                        backgroundColor: colors.inputBg,
+                                        color: colors.textMain,
+                                    }}
                                 />
-                                <label>Issue Date</label>
+                                <label style={{ color: colors.textLabel }}>Issue Date</label>
                             </div>
 
                             <div className="col-6 form-floating">
                                 <input
                                     type="date"
-                                    className="form-control bg-light border-0 fw-medium"
+                                    className="form-control border-0 fw-medium"
                                     value={dueDate}
                                     onChange={(e) => setDueDate(e.target.value)}
+                                    style={{
+                                        backgroundColor: colors.inputBg,
+                                        color: colors.textMain,
+                                    }}
                                 />
-                                <label>Due Date</label>
+                                <label style={{ color: colors.textLabel }}>Due Date</label>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-3 rounded-4 shadow-sm mb-3 border border-light flex-shrink-0">
+                    <div
+                        className="p-3 rounded-4 shadow-sm mb-3 border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         <div className="d-flex justify-content-between align-items-center mb-2">
                             <div
                                 className="bg-dark px-3 py-1 rounded-pill text-white small fw-bold text-uppercase"
@@ -571,15 +657,19 @@ export default function InvoiceCreate() {
                         <button
                             type="button"
                             onClick={() => setShowClientPopup(true)}
-                            className="btn w-100 text-start bg-light border-0 rounded-4 p-3 mt-2 shadow-sm"
+                            className="btn w-100 text-start border-0 rounded-4 p-3 mt-2 shadow-sm"
+                            style={{
+                                backgroundColor: colors.softBg,
+                                color: colors.textMain,
+                            }}
                         >
                             {selectedClient ? (
                                 <div className="d-flex align-items-center justify-content-between gap-3">
                                     <div className="overflow-hidden">
-                                        <div className="fw-bold text-dark text-truncate">
+                                        <div className="fw-bold text-truncate" style={{ color: colors.textMain }}>
                                             {selectedClient.name}
                                         </div>
-                                        <div className="text-muted small text-truncate">
+                                        <div className="small text-truncate" style={{ color: colors.textMuted }}>
                                             {selectedClient.phone ||
                                                 selectedClient.email ||
                                                 "Client selected"}
@@ -593,7 +683,7 @@ export default function InvoiceCreate() {
                                 </div>
                             ) : (
                                 <div className="d-flex align-items-center justify-content-between">
-                                    <span className="fw-bold text-muted">Choose a client...</span>
+                                    <span className="fw-bold" style={{ color: colors.textMuted }}>Choose a client...</span>
                                     <div className="text-primary">
                                         <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                             <path d="M9 18l6-6-6-6" />
@@ -604,7 +694,13 @@ export default function InvoiceCreate() {
                         </button>
                     </div>
 
-                    <div className="bg-white p-3 rounded-4 shadow-sm mb-3 border border-light flex-shrink-0">
+                    <div
+                        className="p-3 rounded-4 shadow-sm mb-3 border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         <div
                             className="bg-secondary px-3 py-1 rounded-pill d-inline-block text-white small fw-bold text-uppercase mb-3"
                             style={{ fontSize: "0.65rem" }}
@@ -614,8 +710,13 @@ export default function InvoiceCreate() {
 
                         {invoiceItems.length === 0 ? (
                             <div
-                                className="text-center py-4 rounded-4 border-dashed bg-light border"
+                                className="text-center py-4 rounded-4 border"
                                 onClick={() => setShowItemPopup(true)}
+                                style={{
+                                    backgroundColor: colors.softBg,
+                                    borderStyle: "dashed",
+                                    borderColor: colors.normalBorder,
+                                }}
                             >
                                 <span className="small fw-bold text-primary">
                                     + Tap to select items
@@ -626,22 +727,31 @@ export default function InvoiceCreate() {
                                 {invoiceItems.map((item) => (
                                     <div
                                         key={item.uniqueId}
-                                        className="p-3 rounded-4 bg-light border shadow-sm d-flex align-items-center justify-content-between gap-3"
+                                        className="p-3 rounded-4 border shadow-sm d-flex align-items-center justify-content-between gap-3"
+                                        style={{
+                                            backgroundColor: colors.softBg,
+                                            borderColor: colors.normalBorder,
+                                        }}
                                     >
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div className="fw-bold text-dark">{item.name}</div>
+                                            <div className="fw-bold" style={{ color: colors.textMain }}>{item.name}</div>
 
-                                            <div className="text-muted small mt-1">
+                                            <div className="small mt-1" style={{ color: colors.textMuted }}>
                                                 {item.serialNo ? `Serial: ${item.serialNo}` : "No serial"}
                                             </div>
 
-                                            <div className="text-muted small d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                            <div className="small d-flex align-items-center gap-1 mt-1 flex-wrap" style={{ color: colors.textMuted }}>
                                                 <span>{money(item.price)}</span>
                                                 <span>×</span>
                                                 <input
                                                     type="number"
                                                     className="form-control form-control-sm text-center fw-bold p-0 mx-1 border-0 shadow-sm"
-                                                    style={{ width: "46px", height: "26px" }}
+                                                    style={{
+                                                        width: "46px",
+                                                        height: "26px",
+                                                        backgroundColor: isDark ? "#3a3a3a" : "#ffffff",
+                                                        color: colors.textMain,
+                                                    }}
                                                     value={item.qty}
                                                     onChange={(e) => updateQty(item.uniqueId, e.target.value)}
                                                 />
@@ -677,7 +787,13 @@ export default function InvoiceCreate() {
                         )}
                     </div>
 
-                    <div className="bg-white p-3 rounded-4 shadow-sm mb-3 border border-light flex-shrink-0">
+                    <div
+                        className="p-3 rounded-4 shadow-sm mb-3 border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         <div
                             className="bg-info px-3 py-1 rounded-pill d-inline-block text-white small fw-bold text-uppercase mb-3"
                             style={{ fontSize: "0.65rem" }}
@@ -685,7 +801,7 @@ export default function InvoiceCreate() {
                             Financial Summary
                         </div>
 
-                        <div className="d-flex justify-content-between mb-2 text-muted fw-bold">
+                        <div className="d-flex justify-content-between mb-2 fw-bold" style={{ color: colors.textMuted }}>
                             <span>Subtotal</span>
                             <span>{money(subtotal)}</span>
                         </div>
@@ -700,25 +816,33 @@ export default function InvoiceCreate() {
                             <span>+ {money(taxAmount)}</span>
                         </div>
 
-                        <div className="row g-2 mb-3 pb-3 border-bottom">
+                        <div className="row g-2 mb-3 pb-3 border-bottom" style={{ borderColor: colors.normalBorder }}>
                             <div className="col-6 form-floating">
                                 <input
                                     type="number"
-                                    className="form-control bg-light border-0 fw-bold text-success"
+                                    className="form-control border-0 fw-bold text-success"
                                     value={discountRate}
                                     onChange={(e) => setDiscountRate(Number(e.target.value))}
+                                    style={{
+                                        backgroundColor: colors.inputBg,
+                                        color: colors.textMain,
+                                    }}
                                 />
-                                <label>Discount %</label>
+                                <label style={{ color: colors.textLabel }}>Discount %</label>
                             </div>
 
                             <div className="col-6 form-floating">
                                 <input
                                     type="number"
-                                    className="form-control bg-light border-0 fw-bold text-danger"
+                                    className="form-control border-0 fw-bold text-danger"
                                     value={taxRate}
                                     onChange={(e) => setTaxRate(Number(e.target.value))}
+                                    style={{
+                                        backgroundColor: colors.inputBg,
+                                        color: colors.textMain,
+                                    }}
                                 />
-                                <label>Tax Rate %</label>
+                                <label style={{ color: colors.textLabel }}>Tax Rate %</label>
                             </div>
                         </div>
 
@@ -732,55 +856,65 @@ export default function InvoiceCreate() {
                         </div>
                     </div>
 
-                    <div className="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light flex-shrink-0">
+                    <div
+                        className="p-3 rounded-4 shadow-sm mb-4 border flex-shrink-0"
+                        style={{
+                            backgroundColor: colors.sectionBg,
+                            borderColor: colors.border,
+                        }}
+                    >
                         <div className="row g-2 mb-3">
                             <div className="col-6 form-floating">
                                 <select
-                                    className="form-select bg-light border-0 fw-bold text-dark"
+                                    className="form-select border-0 fw-bold"
                                     value={paymentMethod}
                                     onChange={(e) => setPaymentMethod(e.target.value)}
                                     style={{
-                                        color: "#212529",
-                                        backgroundColor: "#f8f9fa",
-                                        WebkitTextFillColor: "#212529",
+                                        color: colors.textMain,
+                                        backgroundColor: colors.inputBg,
+                                        WebkitTextFillColor: colors.textMain,
                                     }}
                                 >
-                                    <option value="Cash" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Cash</option>
-                                    <option value="Card" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Card</option>
-                                    <option value="Bank" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Bank</option>
-                                    <option value="UPI" style={{ color: "#212529", backgroundColor: "#ffffff" }}>UPI</option>
+                                    <option value="Cash" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Cash</option>
+                                    <option value="Card" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Card</option>
+                                    <option value="Bank" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Bank</option>
+                                    <option value="UPI" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>UPI</option>
                                 </select>
-                                <label style={{ color: "#495057" }}>Method</label>
+                                <label style={{ color: colors.textLabel }}>Method</label>
                             </div>
 
                             <div className="col-6 form-floating">
                                 <select
-                                    className="form-select bg-light border-0 fw-bold text-dark"
+                                    className="form-select border-0 fw-bold"
                                     value={paymentStatus}
                                     onChange={(e) => setPaymentStatus(e.target.value)}
                                     style={{
-                                        color: "#212529",
-                                        backgroundColor: "#f8f9fa",
-                                        WebkitTextFillColor: "#212529",
+                                        color: colors.textMain,
+                                        backgroundColor: colors.inputBg,
+                                        WebkitTextFillColor: colors.textMain,
                                     }}
                                 >
-                                    <option value="Unpaid" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Unpaid</option>
-                                    <option value="Paid" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Paid</option>
-                                    <option value="Pending" style={{ color: "#212529", backgroundColor: "#ffffff" }}>Pending</option>
+                                    <option value="Unpaid" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Unpaid</option>
+                                    <option value="Paid" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Paid</option>
+                                    <option value="Pending" style={{ color: isDark ? "#ffffff" : "#212529", backgroundColor: isDark ? "#1e1e1e" : "#ffffff" }}>Pending</option>
                                 </select>
-                                <label style={{ color: "#495057" }}>Status</label>
+                                <label style={{ color: colors.textLabel }}>Status</label>
                             </div>
                         </div>
 
                         <div className="form-floating">
                             <textarea
-                                className="form-control bg-light border-0"
-                                style={{ height: "80px" }}
+                                className="form-control border-0"
+                                style={{
+                                    height: "80px",
+                                    backgroundColor: colors.inputBg,
+                                    color: colors.textMain,
+                                }}
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
                                 placeholder="Notes"
                             ></textarea>
-                            <label>Internal Notes (Optional)</label>
+                            <label style={{ color: colors.textLabel }}>Internal Notes (Optional)</label>
                         </div>
                     </div>
 
@@ -823,18 +957,31 @@ export default function InvoiceCreate() {
                         maxWidth: "768px",
                         margin: "0 auto",
                         zIndex: 10000,
+                        backgroundColor: colors.popupBg,
+                        color: colors.textMain,
                     }}
                 >
-                    <header className="p-3 border-bottom d-flex align-items-center justify-content-between bg-white">
+                    <header
+                        className="p-3 border-bottom d-flex align-items-center justify-content-between"
+                        style={{
+                            backgroundColor: colors.popupBg,
+                            borderColor: colors.normalBorder,
+                        }}
+                    >
                         <button
                             onClick={() => setShowClientPopup(false)}
-                            className="btn btn-light btn-sm rounded-pill px-3 fw-bold border text-dark"
+                            className="btn btn-sm rounded-pill px-3 fw-bold border"
                             aria-label="Close client popup"
+                            style={{
+                                backgroundColor: colors.lightBtnBg,
+                                color: colors.textMain,
+                                borderColor: colors.normalBorder,
+                            }}
                         >
                             Close
                         </button>
 
-                        <h6 className="m-0 fw-bold text-dark text-center flex-grow-1">
+                        <h6 className="m-0 fw-bold text-center flex-grow-1" style={{ color: colors.textMain }}>
                             Select Client
                         </h6>
 
@@ -846,62 +993,91 @@ export default function InvoiceCreate() {
                         </button>
                     </header>
 
-                    <div className="p-3 bg-light border-bottom">
+                    <div
+                        className="p-3 border-bottom"
+                        style={{
+                            backgroundColor: colors.popupBodyBg,
+                            borderColor: colors.normalBorder,
+                        }}
+                    >
                         <input
                             type="text"
                             className="form-control rounded-pill border-0 shadow-sm ps-4"
                             placeholder="Search clients..."
                             value={clientSearch}
                             onChange={(e) => setClientSearch(e.target.value)}
-                            style={{ height: "48px" }}
+                            style={{
+                                height: "48px",
+                                backgroundColor: colors.softBg,
+                                color: colors.textMain,
+                            }}
                         />
                     </div>
 
                     <div
-                        className="offcanvas-body bg-light p-3 pt-3"
-                        style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom, 20px))" }}
+                        className="offcanvas-body p-3 pt-3"
+                        style={{
+                            paddingBottom: "calc(20px + env(safe-area-inset-bottom, 20px))",
+                            backgroundColor: colors.popupBodyBg,
+                        }}
                     >
                         <div className="d-flex flex-column gap-3">
                             <div
-                                className="bg-white rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
+                                className="rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
                                 onClick={selectGuestClient}
+                                style={{
+                                    backgroundColor: colors.sectionBg,
+                                    borderColor: colors.normalBorder,
+                                }}
                             >
                                 <div className="overflow-hidden">
-                                    <h6 className="fw-bold m-0">Walk-in Customer</h6>
-                                    <div className="small text-muted mt-1">
+                                    <h6 className="fw-bold m-0" style={{ color: colors.textMain }}>Walk-in Customer</h6>
+                                    <div className="small mt-1" style={{ color: colors.textMuted }}>
                                         Quick billing without saved client details
                                     </div>
                                 </div>
 
                                 <button
-                                    className="btn btn-light rounded-circle shadow-sm border-0 text-primary"
-                                    style={{ width: "36px", height: "36px" }}
+                                    className="btn rounded-circle shadow-sm border-0 text-primary"
+                                    style={{
+                                        width: "36px",
+                                        height: "36px",
+                                        backgroundColor: colors.lightBtnBg,
+                                    }}
                                 >
                                     +
                                 </button>
                             </div>
 
                             {filteredClients.length === 0 ? (
-                                <div className="text-center py-5 opacity-50 small fw-bold">
+                                <div className="text-center py-5 opacity-50 small fw-bold" style={{ color: colors.textMuted }}>
                                     No clients found. Add a client first.
                                 </div>
                             ) : (
                                 filteredClients.map((c) => (
                                     <div
                                         key={c.id}
-                                        className="bg-white rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
+                                        className="rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
                                         onClick={() => selectClient(c)}
+                                        style={{
+                                            backgroundColor: colors.sectionBg,
+                                            borderColor: colors.normalBorder,
+                                        }}
                                     >
                                         <div className="overflow-hidden">
-                                            <h6 className="fw-bold m-0 text-truncate">{c.name}</h6>
-                                            <div className="small text-muted mt-1 text-truncate">
+                                            <h6 className="fw-bold m-0 text-truncate" style={{ color: colors.textMain }}>{c.name}</h6>
+                                            <div className="small mt-1 text-truncate" style={{ color: colors.textMuted }}>
                                                 {c.phone || c.email || c.address || "Saved client"}
                                             </div>
                                         </div>
 
                                         <button
-                                            className="btn btn-light rounded-circle shadow-sm border-0 text-primary"
-                                            style={{ width: "36px", height: "36px" }}
+                                            className="btn rounded-circle shadow-sm border-0 text-primary"
+                                            style={{
+                                                width: "36px",
+                                                height: "36px",
+                                                backgroundColor: colors.lightBtnBg,
+                                            }}
                                         >
                                             +
                                         </button>
@@ -922,18 +1098,31 @@ export default function InvoiceCreate() {
                         maxWidth: "768px",
                         margin: "0 auto",
                         zIndex: 9999,
+                        backgroundColor: colors.popupBg,
+                        color: colors.textMain,
                     }}
                 >
-                    <header className="p-3 border-bottom d-flex align-items-center justify-content-between bg-white">
+                    <header
+                        className="p-3 border-bottom d-flex align-items-center justify-content-between"
+                        style={{
+                            backgroundColor: colors.popupBg,
+                            borderColor: colors.normalBorder,
+                        }}
+                    >
                         <button
                             onClick={() => setShowItemPopup(false)}
-                            className="btn btn-light btn-sm rounded-pill px-3 fw-bold border text-dark"
+                            className="btn btn-sm rounded-pill px-3 fw-bold border"
                             aria-label="Close item popup"
+                            style={{
+                                backgroundColor: colors.lightBtnBg,
+                                color: colors.textMain,
+                                borderColor: colors.normalBorder,
+                            }}
                         >
                             Close
                         </button>
 
-                        <h6 className="m-0 fw-bold text-dark text-center flex-grow-1">
+                        <h6 className="m-0 fw-bold text-center flex-grow-1" style={{ color: colors.textMain }}>
                             Select Billing Items
                         </h6>
 
@@ -945,23 +1134,36 @@ export default function InvoiceCreate() {
                         </button>
                     </header>
 
-                    <div className="p-3 bg-light border-bottom">
+                    <div
+                        className="p-3 border-bottom"
+                        style={{
+                            backgroundColor: colors.popupBodyBg,
+                            borderColor: colors.normalBorder,
+                        }}
+                    >
                         <input
                             type="text"
                             className="form-control rounded-pill border-0 shadow-sm ps-4"
                             placeholder="Search items..."
                             value={itemSearch}
                             onChange={(e) => setItemSearch(e.target.value)}
-                            style={{ height: "48px" }}
+                            style={{
+                                height: "48px",
+                                backgroundColor: colors.softBg,
+                                color: colors.textMain,
+                            }}
                         />
                     </div>
 
                     <div
-                        className="offcanvas-body bg-light p-3 pt-3"
-                        style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom, 20px))" }}
+                        className="offcanvas-body p-3 pt-3"
+                        style={{
+                            paddingBottom: "calc(20px + env(safe-area-inset-bottom, 20px))",
+                            backgroundColor: colors.popupBodyBg,
+                        }}
                     >
                         {filteredInventory.length === 0 ? (
-                            <div className="text-center py-5 opacity-50 small fw-bold">
+                            <div className="text-center py-5 opacity-50 small fw-bold" style={{ color: colors.textMuted }}>
                                 No items found. Add items in inventory first.
                             </div>
                         ) : (
@@ -969,12 +1171,16 @@ export default function InvoiceCreate() {
                                 {filteredInventory.map((i) => (
                                     <div
                                         key={i.id}
-                                        className="bg-white rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
+                                        className="rounded-4 p-3 shadow-sm d-flex justify-content-between align-items-center border"
                                         onClick={() => addItem(i)}
+                                        style={{
+                                            backgroundColor: colors.sectionBg,
+                                            borderColor: colors.normalBorder,
+                                        }}
                                     >
                                         <div className="overflow-hidden">
-                                            <h6 className="fw-bold m-0 text-truncate">{i.name}</h6>
-                                            <div className="small text-muted mt-1 text-truncate">
+                                            <h6 className="fw-bold m-0 text-truncate" style={{ color: colors.textMain }}>{i.name}</h6>
+                                            <div className="small mt-1 text-truncate" style={{ color: colors.textMuted }}>
                                                 Serial: {i.serialNo || "N/A"}
                                             </div>
                                             <span className="text-primary fw-bold small">
@@ -983,8 +1189,12 @@ export default function InvoiceCreate() {
                                         </div>
 
                                         <button
-                                            className="btn btn-light rounded-circle shadow-sm border-0 text-primary"
-                                            style={{ width: "36px", height: "36px" }}
+                                            className="btn rounded-circle shadow-sm border-0 text-primary"
+                                            style={{
+                                                width: "36px",
+                                                height: "36px",
+                                                backgroundColor: colors.lightBtnBg,
+                                            }}
                                         >
                                             +
                                         </button>
@@ -1002,7 +1212,12 @@ export default function InvoiceCreate() {
                             setShowItemPopup(false);
                             setShowClientPopup(false);
                         }}
-                        style={{ zIndex: 9998, maxWidth: "768px", margin: "0 auto" }}
+                        style={{
+                            zIndex: 9998,
+                            maxWidth: "768px",
+                            margin: "0 auto",
+                            backgroundColor: colors.backdrop,
+                        }}
                     ></div>
                 )}
             </div>

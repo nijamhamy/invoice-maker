@@ -43,18 +43,45 @@ export async function getSubscriptionOfferings() {
         await initRevenueCat();
         const result = await Purchases.getOfferings();
 
-        // The Capacitor plugin wraps as { offerings: { current, all } }
-        // Unwrap one level if needed
         const offerings = result?.offerings ?? result;
 
         console.log("[RC] Raw offerings result:", JSON.stringify(result));
         console.log("[RC] Unwrapped offerings:", JSON.stringify(offerings));
         console.log("[RC] Current offering:", JSON.stringify(offerings?.current));
-        console.log("[RC] Available packages:", JSON.stringify(offerings?.current?.availablePackages));
+        console.log(
+            "[RC] Available packages:",
+            JSON.stringify(offerings?.current?.availablePackages)
+        );
 
         return offerings;
     } catch (error) {
         console.error("Failed to fetch offerings:", error);
+        return null;
+    }
+}
+
+export async function getCustomerInfo() {
+    if (!Capacitor.isNativePlatform()) return null;
+
+    try {
+        await initRevenueCat();
+        const result = await Purchases.getCustomerInfo();
+        const customerInfo = unwrapCustomerInfo(result);
+
+        console.log(
+            "[RC] Full CustomerInfo:",
+            JSON.stringify({
+                activeEntitlements: customerInfo?.entitlements?.active,
+                managementURL:
+                    customerInfo?.managementURL ||
+                    customerInfo?.managementUrl ||
+                    null,
+            })
+        );
+
+        return customerInfo;
+    } catch (error) {
+        console.error("Failed to get full customer info:", error);
         return null;
     }
 }
@@ -67,7 +94,10 @@ export async function getCustomerSubscriptionStatus() {
         const result = await Purchases.getCustomerInfo();
         const customerInfo = unwrapCustomerInfo(result);
 
-        console.log("[RC] CustomerInfo:", JSON.stringify(customerInfo?.entitlements?.active));
+        console.log(
+            "[RC] CustomerInfo:",
+            JSON.stringify(customerInfo?.entitlements?.active)
+        );
 
         return hasActiveEntitlement(customerInfo);
     } catch (error) {

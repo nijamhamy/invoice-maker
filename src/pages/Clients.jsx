@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
 // Advanced Native Plugins
@@ -14,10 +15,12 @@ export default function Clients() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const { clients, addClient, updateClient, deleteClient: removeClientStore } = useClientStore();
+    const { clients, addClient, updateClient, deleteClient: removeClientStore } =
+        useClientStore();
 
     const [showForm, setShowForm] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [isDark, setIsDark] = useState(false);
 
     const [client, setClient] = useState({
         id: null,
@@ -28,15 +31,37 @@ export default function Clients() {
     });
 
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({
+                        color: dark ? "#121212" : "#ffffff",
+                    });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
+
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
     }, []);
 
     useEffect(() => {
@@ -112,9 +137,10 @@ export default function Clients() {
         }
     };
 
-    const filteredClients = clients.filter((c) =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.phone && c.phone.includes(searchTerm))
+    const filteredClients = clients.filter(
+        (c) =>
+            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.phone && c.phone.includes(searchTerm))
     );
 
     const getInitials = (name) => (name ? name.charAt(0).toUpperCase() : "?");
@@ -128,35 +154,73 @@ export default function Clients() {
         }
     };
 
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fb",
+        shellBg: isDark ? "#121212" : "#ffffff",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        contentBg: isDark ? "#181818" : "#f8f9fa",
+        formBg: isDark ? "#121212" : "#ffffff",
+        cardBg: isDark ? "#1e1e1e" : "#ffffff",
+        softBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        softBlueBg: isDark ? "#1c2b45" : "#f0f4ff",
+        avatarBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#212529",
+        textDark: isDark ? "#ffffff" : "#212529",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        border: isDark ? "rgba(255,255,255,0.08)" : "#dee2e6",
+        lightBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+        inputBorder: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #dee2e6",
+        formCardBg: isDark ? "#1e1e1e" : "#f8f9fa",
+        formInputBg: isDark ? "#1e1e1e" : "transparent",
+        formLabel: isDark ? "#adb5bd" : "#6c757d",
+        btnLightBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        btnLightText: isDark ? "#ffffff" : "#212529",
+        emptyIconBg: isDark ? "#1e1e1e" : "#ffffff",
+        emptyIconStroke: isDark ? "#adb5bd" : "#6c757d",
+        fabShadow: isDark
+            ? "0 8px 24px rgba(13, 110, 253, 0.45)"
+            : "0 8px 24px rgba(13, 110, 253, 0.35)",
+    };
+
     return (
         <div
             className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
             style={{
                 overflow: "hidden",
-                backgroundColor: "#f8f9fb",
+                backgroundColor: colors.pageBg,
             }}
         >
             <div
                 className="d-flex flex-column mx-auto w-100 h-100 position-relative"
                 style={{
                     maxWidth: "768px",
-                    backgroundColor: "#ffffff",
-                    boxShadow: "0 0 24px rgba(0,0,0,0.04)",
+                    backgroundColor: colors.shellBg,
+                    boxShadow: isDark ? "none" : "0 0 24px rgba(0,0,0,0.04)",
                     overflow: "hidden",
                 }}
             >
                 {showForm ? (
                     <>
-                        {/* FORM HEADER */}
-                        <header className="bg-white border-bottom flex-shrink-0 z-3">
+                        <header
+                            className="border-bottom flex-shrink-0 z-3"
+                            style={{
+                                backgroundColor: colors.headerBg,
+                                borderColor: colors.lightBorder,
+                            }}
+                        >
                             <div
                                 style={{
                                     height: "env(safe-area-inset-top, 0px)",
-                                    backgroundColor: "#ffffff",
+                                    backgroundColor: colors.headerBg,
                                 }}
                             ></div>
 
-                            <div className="p-3 bg-white d-flex align-items-center justify-content-between">
+                            <div
+                                className="p-3 d-flex align-items-center justify-content-between"
+                                style={{ backgroundColor: colors.headerBg }}
+                            >
                                 <button
                                     onClick={handleBack}
                                     className="btn btn-link text-danger text-decoration-none fw-semibold p-0"
@@ -165,7 +229,10 @@ export default function Clients() {
                                     Cancel
                                 </button>
 
-                                <h6 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.4px" }}>
+                                <h6
+                                    className="m-0 fw-bold"
+                                    style={{ letterSpacing: "-0.4px", color: colors.textDark }}
+                                >
                                     {client.id ? "Edit Details" : "New Client"}
                                 </h6>
 
@@ -179,38 +246,48 @@ export default function Clients() {
                             </div>
                         </header>
 
-                        {/* FORM CONTENT */}
                         <main
                             className="d-flex flex-column w-100"
                             style={{
                                 flex: "1 1 0",
                                 overflowY: "auto",
                                 overflowX: "hidden",
-                                backgroundColor: "#ffffff",
+                                backgroundColor: colors.formBg,
                             }}
                         >
                             <div className="container py-4">
                                 <div className="text-center mb-4">
                                     <div
-                                        className="mx-auto rounded-circle bg-light d-flex align-items-center justify-content-center text-primary fw-bold border shadow-sm"
+                                        className="mx-auto rounded-circle d-flex align-items-center justify-content-center text-primary fw-bold border shadow-sm"
                                         style={{
                                             width: "84px",
                                             height: "84px",
                                             fontSize: "2rem",
+                                            backgroundColor: colors.avatarBg,
+                                            borderColor: colors.lightBorder,
                                         }}
                                     >
                                         {getInitials(client.name)}
                                     </div>
-                                    <p className="text-muted small mt-2 mb-0">Client Identity</p>
+                                    <p
+                                        className="small mt-2 mb-0"
+                                        style={{ color: colors.textMuted }}
+                                    >
+                                        Client Identity
+                                    </p>
                                 </div>
 
                                 <div
-                                    className="bg-light p-3 p-sm-4 rounded-4 border border-white shadow-sm mb-4 mx-auto"
-                                    style={{ maxWidth: "600px" }}
+                                    className="p-3 p-sm-4 rounded-4 shadow-sm mb-4 mx-auto"
+                                    style={{
+                                        maxWidth: "600px",
+                                        backgroundColor: colors.formCardBg,
+                                        border: `1px solid ${colors.lightBorder}`,
+                                    }}
                                 >
                                     <div className="form-floating mb-3">
                                         <input
-                                            className="form-control border-0 bg-transparent"
+                                            className="form-control border-0"
                                             id="cName"
                                             name="name"
                                             placeholder="Name"
@@ -218,11 +295,15 @@ export default function Clients() {
                                             onChange={handleChange}
                                             autoFocus
                                             style={{
-                                                borderBottom: "1px solid #dee2e6",
+                                                borderBottom: colors.inputBorder,
                                                 borderRadius: 0,
+                                                backgroundColor: colors.formInputBg,
+                                                color: colors.textMain,
                                             }}
                                         />
-                                        <label htmlFor="cName">Client / Business Name</label>
+                                        <label htmlFor="cName" style={{ color: colors.formLabel }}>
+                                            Client / Business Name
+                                        </label>
                                     </div>
 
                                     <div className="row g-2 mb-3">
@@ -230,7 +311,7 @@ export default function Clients() {
                                             <div className="form-floating">
                                                 <input
                                                     type="tel"
-                                                    className="form-control border-0 bg-transparent"
+                                                    className="form-control border-0"
                                                     id="cPhone"
                                                     name="phone"
                                                     placeholder="Phone"
@@ -238,10 +319,14 @@ export default function Clients() {
                                                     onChange={handleChange}
                                                     style={{
                                                         borderRadius: 0,
-                                                        borderBottom: "1px solid #dee2e6",
+                                                        borderBottom: colors.inputBorder,
+                                                        backgroundColor: colors.formInputBg,
+                                                        color: colors.textMain,
                                                     }}
                                                 />
-                                                <label htmlFor="cPhone">Phone Number</label>
+                                                <label htmlFor="cPhone" style={{ color: colors.formLabel }}>
+                                                    Phone Number
+                                                </label>
                                             </div>
                                         </div>
 
@@ -249,7 +334,7 @@ export default function Clients() {
                                             <div className="form-floating">
                                                 <input
                                                     type="email"
-                                                    className="form-control border-0 bg-transparent"
+                                                    className="form-control border-0"
                                                     id="cEmail"
                                                     name="email"
                                                     placeholder="Email"
@@ -257,30 +342,44 @@ export default function Clients() {
                                                     onChange={handleChange}
                                                     style={{
                                                         borderRadius: 0,
-                                                        borderBottom: "1px solid #dee2e6",
+                                                        borderBottom: colors.inputBorder,
+                                                        backgroundColor: colors.formInputBg,
+                                                        color: colors.textMain,
                                                     }}
                                                 />
-                                                <label htmlFor="cEmail">Email Address</label>
+                                                <label htmlFor="cEmail" style={{ color: colors.formLabel }}>
+                                                    Email Address
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="form-floating">
                                         <textarea
-                                            className="form-control border-0 bg-transparent"
+                                            className="form-control border-0"
                                             id="cAddress"
                                             name="address"
                                             placeholder="Address"
-                                            style={{ height: "100px", borderRadius: 0 }}
+                                            style={{
+                                                height: "100px",
+                                                borderRadius: 0,
+                                                backgroundColor: colors.formInputBg,
+                                                color: colors.textMain,
+                                            }}
                                             value={client.address}
                                             onChange={handleChange}
                                         />
-                                        <label htmlFor="cAddress">Full Billing Address</label>
+                                        <label htmlFor="cAddress" style={{ color: colors.formLabel }}>
+                                            Full Billing Address
+                                        </label>
                                     </div>
                                 </div>
 
                                 <div className="text-center px-4">
-                                    <p className="text-muted small mb-0">
+                                    <p
+                                        className="small mb-0"
+                                        style={{ color: colors.textMuted }}
+                                    >
                                         Add complete client details for faster and more professional invoice creation.
                                     </p>
                                 </div>
@@ -291,16 +390,23 @@ export default function Clients() {
                     </>
                 ) : (
                     <>
-                        {/* LIST HEADER */}
                         <header
-                            className="bg-white shadow-sm flex-shrink-0 z-3"
-                            style={{ paddingTop: "env(safe-area-inset-top)" }}
+                            className="shadow-sm flex-shrink-0 z-3"
+                            style={{
+                                paddingTop: "env(safe-area-inset-top)",
+                                backgroundColor: colors.headerBg,
+                            }}
                         >
                             <div className="px-3 py-3 d-flex align-items-center justify-content-between">
                                 <button
                                     onClick={() => navigate(-1)}
-                                    className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
-                                    style={{ width: "42px", height: "42px" }}
+                                    className="btn rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
+                                    style={{
+                                        width: "42px",
+                                        height: "42px",
+                                        backgroundColor: colors.btnLightBg,
+                                        color: colors.btnLightText,
+                                    }}
                                 >
                                     <svg
                                         width="20"
@@ -315,10 +421,13 @@ export default function Clients() {
                                 </button>
 
                                 <div className="text-center">
-                                    <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
+                                    <h5
+                                        className="m-0 fw-bold"
+                                        style={{ letterSpacing: "-0.5px", color: colors.textDark }}
+                                    >
                                         My Clients
                                     </h5>
-                                    <div className="text-muted small">
+                                    <div className="small" style={{ color: colors.textMuted }}>
                                         {clients.length} saved client{clients.length !== 1 ? "s" : ""}
                                     </div>
                                 </div>
@@ -328,7 +437,9 @@ export default function Clients() {
 
                             <div className="px-3 pb-3">
                                 <div className="position-relative mx-auto" style={{ maxWidth: "600px" }}>
-                                    <div className="position-absolute top-50 start-0 translate-middle-y ps-3 text-primary">
+                                    <div
+                                        className="position-absolute top-50 start-0 translate-middle-y ps-3 text-primary"
+                                    >
                                         <svg
                                             width="18"
                                             height="18"
@@ -343,35 +454,45 @@ export default function Clients() {
 
                                     <input
                                         type="text"
-                                        className="form-control border-0 rounded-4 ps-5 shadow-sm bg-light"
+                                        className="form-control border-0 rounded-4 ps-5 shadow-sm"
                                         placeholder="Search by name or phone..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        style={{ height: "48px", fontSize: "0.95rem" }}
+                                        style={{
+                                            height: "48px",
+                                            fontSize: "0.95rem",
+                                            backgroundColor: colors.softBg,
+                                            color: colors.textMain,
+                                        }}
                                     />
                                 </div>
                             </div>
                         </header>
 
-                        {/* LIST CONTENT */}
                         <main
                             className="d-flex flex-column w-100"
                             style={{
                                 flex: "1 1 0",
                                 overflowY: "auto",
                                 overflowX: "hidden",
-                                backgroundColor: "#f8f9fa",
+                                backgroundColor: colors.contentBg,
                             }}
                         >
                             <div className="container py-3">
                                 {filteredClients.length === 0 ? (
                                     <div className="text-center py-5 mt-4">
-                                        <div className="mb-4 d-inline-block p-4 rounded-circle bg-white shadow-sm border opacity-75">
+                                        <div
+                                            className="mb-4 d-inline-block p-4 rounded-circle shadow-sm border opacity-75"
+                                            style={{
+                                                backgroundColor: colors.emptyIconBg,
+                                                borderColor: colors.lightBorder,
+                                            }}
+                                        >
                                             <svg
                                                 width="64"
                                                 height="64"
                                                 fill="none"
-                                                stroke="#6c757d"
+                                                stroke={colors.emptyIconStroke}
                                                 strokeWidth="1"
                                                 viewBox="0 0 24 24"
                                             >
@@ -379,11 +500,14 @@ export default function Clients() {
                                             </svg>
                                         </div>
 
-                                        <h6 className="fw-bold text-dark mb-1">
+                                        <h6 className="fw-bold mb-1" style={{ color: colors.textDark }}>
                                             {clients.length === 0 ? "Your Client List is Empty" : "No Matching Clients"}
                                         </h6>
 
-                                        <p className="text-muted px-4 small mb-0">
+                                        <p
+                                            className="px-4 small mb-0"
+                                            style={{ color: colors.textMuted }}
+                                        >
                                             {clients.length === 0
                                                 ? "Tap the plus button below to add your first client."
                                                 : "Try another search term or add a new client."}
@@ -394,11 +518,12 @@ export default function Clients() {
                                         {filteredClients.map((c) => (
                                             <div key={c.id} className="col-12 col-md-6">
                                                 <div
-                                                    className="card border-0 shadow-sm rounded-4 overflow-hidden h-100 bg-white"
+                                                    className="card border-0 shadow-sm rounded-4 overflow-hidden h-100"
                                                     onClick={() => openEditForm(c)}
                                                     style={{
                                                         cursor: "pointer",
                                                         transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                                                        backgroundColor: colors.cardBg,
                                                     }}
                                                 >
                                                     <div className="card-body p-3">
@@ -411,7 +536,9 @@ export default function Clients() {
                                                                         height: "52px",
                                                                         minWidth: "52px",
                                                                         fontSize: "1.2rem",
-                                                                        border: "3px solid #fff",
+                                                                        border: isDark
+                                                                            ? "3px solid rgba(255,255,255,0.12)"
+                                                                            : "3px solid #fff",
                                                                     }}
                                                                 >
                                                                     {getInitials(c.name)}
@@ -419,14 +546,20 @@ export default function Clients() {
 
                                                                 <div className="text-truncate w-100">
                                                                     <h6
-                                                                        className="fw-bold text-dark mb-1 text-truncate"
-                                                                        style={{ fontSize: "1.05rem" }}
+                                                                        className="fw-bold mb-1 text-truncate"
+                                                                        style={{
+                                                                            fontSize: "1.05rem",
+                                                                            color: colors.textDark,
+                                                                        }}
                                                                     >
                                                                         {c.name}
                                                                     </h6>
 
                                                                     <div className="d-flex flex-column gap-1">
-                                                                        <span className="text-muted small d-flex align-items-center gap-1 text-truncate">
+                                                                        <span
+                                                                            className="small d-flex align-items-center gap-1 text-truncate"
+                                                                            style={{ color: colors.textMuted }}
+                                                                        >
                                                                             <svg
                                                                                 width="12"
                                                                                 height="12"
@@ -440,7 +573,10 @@ export default function Clients() {
                                                                             {c.phone || "No phone"}
                                                                         </span>
 
-                                                                        <span className="text-muted small d-flex align-items-center gap-1 text-truncate">
+                                                                        <span
+                                                                            className="small d-flex align-items-center gap-1 text-truncate"
+                                                                            style={{ color: colors.textMuted }}
+                                                                        >
                                                                             <svg
                                                                                 width="12"
                                                                                 height="12"
@@ -476,22 +612,28 @@ export default function Clients() {
                                                         </div>
 
                                                         {c.address && (
-                                                            <div className="small text-muted mb-3 text-truncate">
+                                                            <div
+                                                                className="small mb-3 text-truncate"
+                                                                style={{ color: colors.textMuted }}
+                                                            >
                                                                 {c.address}
                                                             </div>
                                                         )}
 
-                                                        <div className="d-flex gap-2 pt-2 border-top">
+                                                        <div
+                                                            className="d-flex gap-2 pt-2 border-top"
+                                                            style={{ borderColor: colors.lightBorder }}
+                                                        >
                                                             <a
                                                                 href={c.phone ? `tel:${c.phone}` : "#"}
                                                                 onClick={(e) => {
                                                                     if (!c.phone) e.preventDefault();
                                                                     e.stopPropagation();
                                                                 }}
-                                                                className="btn btn-light flex-grow-1 py-2 rounded-3 border-0 d-flex align-items-center justify-content-center gap-2 text-primary fw-bold"
+                                                                className="btn flex-grow-1 py-2 rounded-3 border-0 d-flex align-items-center justify-content-center gap-2 text-primary fw-bold"
                                                                 style={{
                                                                     fontSize: "0.8rem",
-                                                                    backgroundColor: "#f0f4ff",
+                                                                    backgroundColor: colors.softBlueBg,
                                                                     opacity: c.phone ? 1 : 0.6,
                                                                 }}
                                                             >
@@ -507,10 +649,10 @@ export default function Clients() {
                                                                     if (!c.email) e.preventDefault();
                                                                     e.stopPropagation();
                                                                 }}
-                                                                className="btn btn-light flex-grow-1 py-2 rounded-3 border-0 d-flex align-items-center justify-content-center gap-2 text-primary fw-bold"
+                                                                className="btn flex-grow-1 py-2 rounded-3 border-0 d-flex align-items-center justify-content-center gap-2 text-primary fw-bold"
                                                                 style={{
                                                                     fontSize: "0.8rem",
-                                                                    backgroundColor: "#f0f4ff",
+                                                                    backgroundColor: colors.softBlueBg,
                                                                     opacity: c.email ? 1 : 0.6,
                                                                 }}
                                                             >
@@ -531,7 +673,6 @@ export default function Clients() {
                             </div>
                         </main>
 
-                        {/* FAB */}
                         <button
                             className="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center"
                             style={{
@@ -542,7 +683,7 @@ export default function Clients() {
                                 height: "60px",
                                 zIndex: 1050,
                                 border: "none",
-                                boxShadow: "0 8px 24px rgba(13, 110, 253, 0.35)",
+                                boxShadow: colors.fabShadow,
                             }}
                             onClick={openAddForm}
                             aria-label="Add client"

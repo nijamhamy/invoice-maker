@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import {
     getSubscriptionOfferings,
@@ -7,7 +8,6 @@ import {
     purchaseSubscription,
     restoreUserPurchases,
 } from "../services/revenuecat";
-
 
 export default function Premium() {
     const navigate = useNavigate();
@@ -18,20 +18,41 @@ export default function Premium() {
     const [packages, setPackages] = useState([]);
     const [selectedPackageId, setSelectedPackageId] = useState(null);
     const [error, setError] = useState("");
-
+    const [isDark, setIsDark] = useState(false);
 
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({
+                        color: dark ? "#121212" : "#ffffff",
+                    });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
-    }, []);
 
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
+    }, []);
 
     useEffect(() => {
         const loadPremiumData = async () => {
@@ -46,23 +67,21 @@ export default function Premium() {
 
                 setIsSubscribed(subscribed);
 
-                // offeringsResult is already unwrapped in revenuecat.js
-                // .current is the default/current offering
                 const availablePackages = offeringsResult?.current?.availablePackages || [];
 
                 console.log("[Premium] packages count:", availablePackages.length);
-                console.log("[Premium] packages:", JSON.stringify(
-                    availablePackages.map(p => ({
-                        id: p.identifier,
-                        type: p.packageType,
-                        price: p.product?.priceString,
-                        productId: p.product?.productIdentifier,
-                    }))
-                ));
+                console.log(
+                    "[Premium] packages:",
+                    JSON.stringify(
+                        availablePackages.map((p) => ({
+                            id: p.identifier,
+                            type: p.packageType,
+                            price: p.product?.priceString,
+                            productId: p.product?.productIdentifier,
+                        }))
+                    )
+                );
 
-                // Sort: Monthly first, Annual/Yearly second
-                // $rc_monthly -> packageType: "MONTHLY"
-                // $rc_annual  -> packageType: "ANNUAL"
                 const sortedPackages = [...availablePackages].sort((a, b) => {
                     const order = { MONTHLY: 1, ANNUAL: 2, YEARLY: 2 };
                     const aType = String(a?.packageType || "").toUpperCase();
@@ -87,21 +106,25 @@ export default function Premium() {
         loadPremiumData();
     }, []);
 
-
     const selectedPackage = useMemo(() => {
         return packages.find((pkg) => pkg.identifier === selectedPackageId) || null;
     }, [packages, selectedPackageId]);
 
-
     const getPackageMeta = (pkg) => {
         const type = String(pkg?.packageType || "").toUpperCase();
-        const productId = String(pkg?.product?.productIdentifier || pkg?.identifier || "").toLowerCase();
+        const productId = String(
+            pkg?.product?.productIdentifier || pkg?.identifier || ""
+        ).toLowerCase();
 
-        // Support standard RC types AND product-id-based fallback
-        const isYearly = type === "ANNUAL" || type === "YEARLY"
-            || productId.includes("year") || productId.includes("annual");
-        const isMonthly = type === "MONTHLY"
-            || productId.includes("month");
+        const isYearly =
+            type === "ANNUAL" ||
+            type === "YEARLY" ||
+            productId.includes("year") ||
+            productId.includes("annual");
+
+        const isMonthly =
+            type === "MONTHLY" ||
+            productId.includes("month");
 
         const title = isYearly
             ? "Yearly Plan"
@@ -124,7 +147,6 @@ export default function Premium() {
         return { title, subtitle, badge };
     };
 
-
     const handlePurchase = async () => {
         if (!selectedPackage || isPurchasing) return;
 
@@ -145,7 +167,6 @@ export default function Premium() {
             setIsPurchasing(false);
         }
     };
-
 
     const handleRestore = async () => {
         if (isRestoring) return;
@@ -168,29 +189,69 @@ export default function Premium() {
         }
     };
 
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fb",
+        shellBg: isDark ? "#121212" : "#f8f9fb",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        cardBg: isDark ? "#1e1e1e" : "#ffffff",
+        textMain: isDark ? "#ffffff" : "#111827",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.04)",
+        btnLightBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        btnLightText: isDark ? "#ffffff" : "#212529",
+        heroBg: isDark
+            ? "linear-gradient(135deg, #3a2d08 0%, #1e1e1e 55%, #473709 100%)"
+            : "linear-gradient(135deg, #fff9e8 0%, #ffffff 55%, #fff4cc 100%)",
+        selectedBorder: isDark ? "2px solid #f59f00" : "2px solid #f59f00",
+        selectedShadow: isDark
+            ? "0 0 0 4px rgba(245,159,0,0.12), 0 8px 24px rgba(0,0,0,0.22)"
+            : "0 0 0 4px rgba(245,159,0,0.08), 0 8px 24px rgba(0,0,0,0.06)",
+        radioBorder: isDark ? "#6c757d" : "#ced4da",
+        radioBg: isDark ? "#2a2a2a" : "#fff",
+        radioSelectedBg: isDark ? "#4a3a10" : "#fff3cd",
+        alertBg: isDark ? "rgba(201,42,42,0.16)" : "#fff5f5",
+        alertText: isDark ? "#ff8787" : "#c92a2a",
+        activeBadgeBg: isDark ? "rgba(25,135,84,0.18)" : "rgba(25,135,84,0.12)",
+        activeBadgeText: isDark ? "#8ce99a" : "#198754",
+        badgeDefaultBg: isDark ? "rgba(13,110,253,0.18)" : "rgba(13,110,253,0.08)",
+        badgeDefaultText: isDark ? "#8fb8ff" : "#0d6efd",
+        badgeSelectedBg: isDark ? "rgba(245,159,0,0.18)" : "rgba(245,159,0,0.14)",
+        badgeSelectedText: isDark ? "#ffd666" : "#b77900",
+    };
 
     return (
-        <div className="d-flex flex-column w-100 h-100 bg-light" style={{ overflow: "hidden" }}>
+        <div
+            className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{ overflow: "hidden", backgroundColor: colors.pageBg }}
+        >
             <div
                 className="d-flex flex-column mx-auto w-100 h-100 position-relative"
                 style={{
                     maxWidth: "768px",
-                    backgroundColor: "#f8f9fb",
+                    backgroundColor: colors.shellBg,
                     overflow: "hidden",
                 }}
             >
                 <header
-                    className="bg-white shadow-sm flex-shrink-0 z-3"
+                    className="shadow-sm flex-shrink-0 z-3"
                     style={{
                         paddingTop: "env(safe-area-inset-top)",
-                        borderBottom: "1px solid rgba(0,0,0,0.04)",
+                        borderBottom: colors.border,
+                        backgroundColor: colors.headerBg,
                     }}
                 >
                     <div className="px-3 py-3 d-flex align-items-center justify-content-between">
                         <button
                             onClick={() => navigate(-1)}
-                            className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
-                            style={{ width: "42px", height: "42px" }}
+                            className="btn rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
+                            style={{
+                                width: "42px",
+                                height: "42px",
+                                backgroundColor: colors.btnLightBg,
+                                color: colors.btnLightText,
+                            }}
                         >
                             <svg
                                 width="22"
@@ -205,10 +266,15 @@ export default function Premium() {
                         </button>
 
                         <div className="text-center">
-                            <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
+                            <h5
+                                className="m-0 fw-bold"
+                                style={{ letterSpacing: "-0.5px", color: colors.textMain }}
+                            >
                                 Premium
                             </h5>
-                            <div className="text-muted small">Remove ads and unlock a cleaner experience</div>
+                            <div className="small" style={{ color: colors.textMuted }}>
+                                Remove ads and unlock a cleaner experience
+                            </div>
                         </div>
 
                         <div style={{ width: 42 }}></div>
@@ -221,14 +287,14 @@ export default function Premium() {
                         flex: "1 1 0",
                         overflowY: "auto",
                         overflowX: "hidden",
-                        backgroundColor: "#f8f9fb",
+                        backgroundColor: colors.pageBg,
                     }}
                 >
                     <div className="container py-4">
                         <div
                             className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4"
                             style={{
-                                background: "linear-gradient(135deg, #fff9e8 0%, #ffffff 55%, #fff4cc 100%)",
+                                background: colors.heroBg,
                             }}
                         >
                             <div className="p-4 p-sm-4">
@@ -251,8 +317,8 @@ export default function Premium() {
                                         <span
                                             className="badge rounded-pill px-3 py-2"
                                             style={{
-                                                backgroundColor: "rgba(25,135,84,0.12)",
-                                                color: "#198754",
+                                                backgroundColor: colors.activeBadgeBg,
+                                                color: colors.activeBadgeText,
                                                 fontWeight: 700,
                                                 fontSize: "0.74rem",
                                             }}
@@ -262,10 +328,20 @@ export default function Premium() {
                                     )}
                                 </div>
 
-                                <h3 className="fw-bold text-dark mb-2" style={{ letterSpacing: "-0.6px" }}>
+                                <h3
+                                    className="fw-bold mb-2"
+                                    style={{ letterSpacing: "-0.6px", color: colors.textMain }}
+                                >
                                     Enjoy Eazy Bill without ads
                                 </h3>
-                                <p className="text-muted mb-0" style={{ fontSize: "0.95rem", lineHeight: 1.6 }}>
+                                <p
+                                    className="mb-0"
+                                    style={{
+                                        fontSize: "0.95rem",
+                                        lineHeight: 1.6,
+                                        color: colors.textMuted,
+                                    }}
+                                >
                                     Upgrade to premium and remove banner ads and interstitial ads for a faster, cleaner billing experience across your app.
                                 </p>
                             </div>
@@ -273,36 +349,56 @@ export default function Premium() {
 
                         <div className="row g-3 mb-4">
                             <div className="col-12 col-md-4">
-                                <div className="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                                <div
+                                    className="card border-0 shadow-sm rounded-4 h-100"
+                                    style={{ backgroundColor: colors.cardBg }}
+                                >
                                     <div className="p-3">
-                                        <div className="fw-bold text-dark mb-1" style={{ fontSize: "0.92rem" }}>
+                                        <div
+                                            className="fw-bold mb-1"
+                                            style={{ fontSize: "0.92rem", color: colors.textMain }}
+                                        >
                                             Ad-free experience
                                         </div>
-                                        <div className="text-muted small">
+                                        <div className="small" style={{ color: colors.textMuted }}>
                                             Remove banner ads and interstitial ads and work with fewer distractions.
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                             <div className="col-12 col-md-4">
-                                <div className="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                                <div
+                                    className="card border-0 shadow-sm rounded-4 h-100"
+                                    style={{ backgroundColor: colors.cardBg }}
+                                >
                                     <div className="p-3">
-                                        <div className="fw-bold text-dark mb-1" style={{ fontSize: "0.92rem" }}>
+                                        <div
+                                            className="fw-bold mb-1"
+                                            style={{ fontSize: "0.92rem", color: colors.textMain }}
+                                        >
                                             Clean screens
                                         </div>
-                                        <div className="text-muted small">
+                                        <div className="small" style={{ color: colors.textMuted }}>
                                             Get more space for invoices, reports, and business work.
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                             <div className="col-12 col-md-4">
-                                <div className="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                                <div
+                                    className="card border-0 shadow-sm rounded-4 h-100"
+                                    style={{ backgroundColor: colors.cardBg }}
+                                >
                                     <div className="p-3">
-                                        <div className="fw-bold text-dark mb-1" style={{ fontSize: "0.92rem" }}>
+                                        <div
+                                            className="fw-bold mb-1"
+                                            style={{ fontSize: "0.92rem", color: colors.textMain }}
+                                        >
                                             Easy restore
                                         </div>
-                                        <div className="text-muted small">
+                                        <div className="small" style={{ color: colors.textMuted }}>
                                             Restore your premium access anytime after reinstalling.
                                         </div>
                                     </div>
@@ -312,19 +408,26 @@ export default function Premium() {
 
                         <div className="mb-2 d-flex align-items-center justify-content-between">
                             <h6
-                                className="text-muted small fw-bold text-uppercase ms-2 mb-0"
-                                style={{ letterSpacing: "0.6px" }}
+                                className="small fw-bold text-uppercase ms-2 mb-0"
+                                style={{ letterSpacing: "0.6px", color: colors.textMuted }}
                             >
                                 Choose your plan
                             </h6>
                         </div>
 
                         {isLoading ? (
-                            <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+                            <div
+                                className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4"
+                                style={{ backgroundColor: colors.cardBg }}
+                            >
                                 <div className="p-4 text-center">
                                     <div className="spinner-border text-warning mb-3" role="status" />
-                                    <div className="fw-bold text-dark">Loading premium plans...</div>
-                                    <div className="text-muted small mt-1">Please wait a moment</div>
+                                    <div className="fw-bold" style={{ color: colors.textMain }}>
+                                        Loading premium plans...
+                                    </div>
+                                    <div className="small mt-1" style={{ color: colors.textMuted }}>
+                                        Please wait a moment
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -342,13 +445,12 @@ export default function Premium() {
                                             key={pkg.identifier}
                                             type="button"
                                             onClick={() => setSelectedPackageId(pkg.identifier)}
-                                            className="card border-0 shadow-sm rounded-4 overflow-hidden text-start bg-white"
+                                            className="card border-0 shadow-sm rounded-4 overflow-hidden text-start"
                                             style={{
                                                 outline: "none",
-                                                border: isSelected ? "2px solid #f59f00" : "2px solid transparent",
-                                                boxShadow: isSelected
-                                                    ? "0 0 0 4px rgba(245,159,0,0.08), 0 8px 24px rgba(0,0,0,0.06)"
-                                                    : undefined,
+                                                backgroundColor: colors.cardBg,
+                                                border: isSelected ? colors.selectedBorder : "2px solid transparent",
+                                                boxShadow: isSelected ? colors.selectedShadow : undefined,
                                                 transition: "all 0.2s ease",
                                             }}
                                         >
@@ -359,21 +461,32 @@ export default function Premium() {
                                                         width: "24px",
                                                         height: "24px",
                                                         minWidth: "24px",
-                                                        border: isSelected ? "7px solid #f59f00" : "2px solid #ced4da",
-                                                        backgroundColor: isSelected ? "#fff3cd" : "#fff",
+                                                        border: isSelected
+                                                            ? "7px solid #f59f00"
+                                                            : `2px solid ${colors.radioBorder}`,
+                                                        backgroundColor: isSelected
+                                                            ? colors.radioSelectedBg
+                                                            : colors.radioBg,
                                                     }}
                                                 />
 
                                                 <div className="flex-grow-1">
                                                     <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                        <div className="fw-bold text-dark" style={{ fontSize: "1rem" }}>
+                                                        <div
+                                                            className="fw-bold"
+                                                            style={{ fontSize: "1rem", color: colors.textMain }}
+                                                        >
                                                             {meta.title}
                                                         </div>
                                                         <span
                                                             className="badge rounded-pill"
                                                             style={{
-                                                                backgroundColor: isSelected ? "rgba(245,159,0,0.14)" : "rgba(13,110,253,0.08)",
-                                                                color: isSelected ? "#b77900" : "#0d6efd",
+                                                                backgroundColor: isSelected
+                                                                    ? colors.badgeSelectedBg
+                                                                    : colors.badgeDefaultBg,
+                                                                color: isSelected
+                                                                    ? colors.badgeSelectedText
+                                                                    : colors.badgeDefaultText,
                                                                 fontSize: "0.68rem",
                                                                 fontWeight: 700,
                                                                 padding: "6px 10px",
@@ -383,9 +496,17 @@ export default function Premium() {
                                                         </span>
                                                     </div>
 
-                                                    <div className="text-muted small mb-2">{meta.subtitle}</div>
+                                                    <div
+                                                        className="small mb-2"
+                                                        style={{ color: colors.textMuted }}
+                                                    >
+                                                        {meta.subtitle}
+                                                    </div>
 
-                                                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
+                                                    <div
+                                                        className="fw-bold"
+                                                        style={{ fontSize: "1.1rem", color: colors.textMain }}
+                                                    >
                                                         {priceText}
                                                     </div>
                                                 </div>
@@ -394,7 +515,7 @@ export default function Premium() {
                                                     width="22"
                                                     height="22"
                                                     fill="none"
-                                                    stroke={isSelected ? "#f59f00" : "#adb5bd"}
+                                                    stroke={isSelected ? "#f59f00" : isDark ? "#868e96" : "#adb5bd"}
                                                     strokeWidth="2.2"
                                                     viewBox="0 0 24 24"
                                                 >
@@ -411,8 +532,8 @@ export default function Premium() {
                             <div
                                 className="alert border-0 rounded-4 shadow-sm mb-4"
                                 style={{
-                                    backgroundColor: "#fff5f5",
-                                    color: "#c92a2a",
+                                    backgroundColor: colors.alertBg,
+                                    color: colors.alertText,
                                 }}
                             >
                                 <div className="fw-bold mb-1">Something went wrong</div>
@@ -420,7 +541,10 @@ export default function Premium() {
                             </div>
                         )}
 
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+                        <div
+                            className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4"
+                            style={{ backgroundColor: colors.cardBg }}
+                        >
                             <div className="p-3 p-sm-4">
                                 <button
                                     type="button"
@@ -452,22 +576,36 @@ export default function Premium() {
                                     type="button"
                                     onClick={handleRestore}
                                     disabled={isRestoring || isLoading}
-                                    className="btn btn-light w-100 rounded-4 fw-semibold mt-3 border"
-                                    style={{ minHeight: "50px" }}
+                                    className="btn w-100 rounded-4 fw-semibold mt-3 border"
+                                    style={{
+                                        minHeight: "50px",
+                                        backgroundColor: colors.btnLightBg,
+                                        color: colors.btnLightText,
+                                        borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)",
+                                    }}
                                 >
                                     {isRestoring ? "Restoring Purchases..." : "Restore Purchases"}
                                 </button>
 
-                                <div className="text-center text-muted small mt-3" style={{ lineHeight: 1.6 }}>
+                                <div
+                                    className="text-center small mt-3"
+                                    style={{ lineHeight: 1.6, color: colors.textMuted }}
+                                >
                                     Your purchase will be handled securely through Google Play.
                                     Premium removes banner ads and interstitial ads from your Eazy Bill app experience.
                                 </div>
                             </div>
                         </div>
 
-                        <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+                        <div
+                            className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4"
+                            style={{ backgroundColor: colors.cardBg }}
+                        >
                             <div className="p-3 p-sm-4">
-                                <div className="fw-bold text-dark mb-3" style={{ fontSize: "0.96rem" }}>
+                                <div
+                                    className="fw-bold mb-3"
+                                    style={{ fontSize: "0.96rem", color: colors.textMain }}
+                                >
                                     Why go premium?
                                 </div>
                                 <div className="d-flex flex-column gap-3">
@@ -481,8 +619,12 @@ export default function Premium() {
                                             </svg>
                                         </div>
                                         <div>
-                                            <div className="fw-semibold text-dark">Better working space</div>
-                                            <div className="text-muted small">No banner ads or interstitial ads while viewing business data and invoices.</div>
+                                            <div className="fw-semibold" style={{ color: colors.textMain }}>
+                                                Better working space
+                                            </div>
+                                            <div className="small" style={{ color: colors.textMuted }}>
+                                                No banner ads or interstitial ads while viewing business data and invoices.
+                                            </div>
                                         </div>
                                     </div>
 
@@ -497,8 +639,12 @@ export default function Premium() {
                                             </svg>
                                         </div>
                                         <div>
-                                            <div className="fw-semibold text-dark">Faster workflow</div>
-                                            <div className="text-muted small">Work smoothly without ad interruptions during billing and navigation.</div>
+                                            <div className="fw-semibold" style={{ color: colors.textMain }}>
+                                                Faster workflow
+                                            </div>
+                                            <div className="small" style={{ color: colors.textMuted }}>
+                                                Work smoothly without ad interruptions during billing and navigation.
+                                            </div>
                                         </div>
                                     </div>
 
@@ -513,8 +659,12 @@ export default function Premium() {
                                             </svg>
                                         </div>
                                         <div>
-                                            <div className="fw-semibold text-dark">Simple restore support</div>
-                                            <div className="text-muted small">Restore premium anytime if you change device or reinstall.</div>
+                                            <div className="fw-semibold" style={{ color: colors.textMain }}>
+                                                Simple restore support
+                                            </div>
+                                            <div className="small" style={{ color: colors.textMuted }}>
+                                                Restore premium anytime if you change device or reinstall.
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { getData } from "../utils/storage";
 import { getSettings } from "../utils/settings";
 import { v4 as uuid } from "uuid";
@@ -19,17 +20,40 @@ export default function Reports() {
         new Date().toISOString().split("T")[0]
     );
     const [reportData, setReportData] = useState([]);
+    const [isDark, setIsDark] = useState(false);
 
     useEffect(() => {
-        const initStatusBar = async () => {
-            try {
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: "#ffffff" });
-            } catch (e) {
-                console.warn("StatusBar plugin not available or running in web", e);
+        const applyTheme = async () => {
+            const dark =
+                document.documentElement.getAttribute("data-theme") === "dark" ||
+                document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+                document.body.classList.contains("dark-mode");
+
+            setIsDark(dark);
+
+            document.documentElement.style.colorScheme = dark ? "dark" : "light";
+            document.body.style.colorScheme = dark ? "dark" : "light";
+
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+                    await StatusBar.setBackgroundColor({
+                        color: dark ? "#121212" : "#ffffff",
+                    });
+                } catch (e) {
+                    console.warn("StatusBar plugin not available or running in web", e);
+                }
             }
         };
-        initStatusBar();
+
+        applyTheme();
+        window.addEventListener("storage", applyTheme);
+        window.addEventListener("theme-change", applyTheme);
+
+        return () => {
+            window.removeEventListener("storage", applyTheme);
+            window.removeEventListener("theme-change", applyTheme);
+        };
     }, []);
 
     useEffect(() => {
@@ -71,7 +95,10 @@ export default function Reports() {
         const totalInvoices = reportData.length;
         const paidCount = reportData.filter((i) => i.paymentStatus === "Paid").length;
         const unpaidCount = reportData.filter((i) => i.paymentStatus === "Unpaid").length;
-        const totalAmount = reportData.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+        const totalAmount = reportData.reduce(
+            (sum, inv) => sum + Number(inv.total || 0),
+            0
+        );
 
         return {
             totalInvoices,
@@ -85,7 +112,10 @@ export default function Reports() {
         if (reportData.length === 0) return;
 
         const reportId = `REP-${uuid()}`;
-        const dayTotal = reportData.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
+        const dayTotal = reportData.reduce(
+            (sum, inv) => sum + Number(inv.total || 0),
+            0
+        );
 
         const reportInvoiceFormat = {
             id: reportId,
@@ -121,12 +151,58 @@ export default function Reports() {
         });
     };
 
+    const colors = {
+        pageBg: isDark ? "#121212" : "#f8f9fb",
+        shellBg: isDark ? "#121212" : "#f8f9fb",
+        headerBg: isDark ? "#1e1e1e" : "#ffffff",
+        cardBg: isDark ? "#1e1e1e" : "#ffffff",
+        softBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        textMain: isDark ? "#ffffff" : "#111827",
+        textMuted: isDark ? "#adb5bd" : "#6c757d",
+        border: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+        pillBg: isDark ? "#1e1e1e" : "#ffffff",
+        pillBorder: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)",
+        inputBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        inputText: isDark ? "#ffffff" : "#111827",
+        previewBtnBg: isDark ? "#ffffff" : "#212529",
+        previewBtnText: isDark ? "#121212" : "#ffffff",
+        incomeCardBg: isDark
+            ? "linear-gradient(135deg, #0d3f8f 0%, #0a58ca 100%)"
+            : "linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)",
+        emptyBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        emptyBorder: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)",
+        badgeBg: isDark ? "#ffffff" : "#212529",
+        badgeText: isDark ? "#121212" : "#ffffff",
+        btnLightBg: isDark ? "#2a2a2a" : "#f8f9fa",
+        btnLightText: isDark ? "#ffffff" : "#212529",
+    };
+
     const SummaryCard = ({ title, value, subtitle, tone = "default" }) => {
         const toneStyles = {
-            default: { bg: "#ffffff", value: "#111827", badge: "#6b7280" },
-            success: { bg: "#ecfdf3", value: "#059669", badge: "#10b981" },
-            warning: { bg: "#fff7ed", value: "#ea580c", badge: "#f97316" },
-            primary: { bg: "#eff6ff", value: "#2563eb", badge: "#3b82f6" },
+            default: {
+                bg: isDark ? "#1e1e1e" : "#ffffff",
+                value: isDark ? "#ffffff" : "#111827",
+                badge: isDark ? "#adb5bd" : "#6b7280",
+                title: isDark ? "#adb5bd" : "#6c757d",
+            },
+            success: {
+                bg: isDark ? "rgba(5,150,105,0.16)" : "#ecfdf3",
+                value: isDark ? "#6ee7b7" : "#059669",
+                badge: isDark ? "#34d399" : "#10b981",
+                title: isDark ? "#a7f3d0" : "#6c757d",
+            },
+            warning: {
+                bg: isDark ? "rgba(234,88,12,0.16)" : "#fff7ed",
+                value: isDark ? "#fdba74" : "#ea580c",
+                badge: isDark ? "#fb923c" : "#f97316",
+                title: isDark ? "#fed7aa" : "#6c757d",
+            },
+            primary: {
+                bg: isDark ? "rgba(37,99,235,0.16)" : "#eff6ff",
+                value: isDark ? "#93c5fd" : "#2563eb",
+                badge: isDark ? "#60a5fa" : "#3b82f6",
+                title: isDark ? "#bfdbfe" : "#6c757d",
+            },
         };
 
         const current = toneStyles[tone] || toneStyles.default;
@@ -138,10 +214,19 @@ export default function Reports() {
                     style={{ backgroundColor: current.bg }}
                 >
                     <div className="card-body p-3">
-                        <div className="text-muted small fw-semibold mb-2">{title}</div>
+                        <div
+                            className="small fw-semibold mb-2"
+                            style={{ color: current.title }}
+                        >
+                            {title}
+                        </div>
                         <div
                             className="fw-bold"
-                            style={{ fontSize: "1.15rem", color: current.value, lineHeight: 1.2 }}
+                            style={{
+                                fontSize: "1.15rem",
+                                color: current.value,
+                                lineHeight: 1.2,
+                            }}
                         >
                             {value}
                         </div>
@@ -161,27 +246,37 @@ export default function Reports() {
 
     return (
         <div
-            className="d-flex flex-column w-100 h-100 bg-light"
-            style={{ overflow: "hidden" }}
+            className="d-flex flex-column w-100 h-100"
+            data-theme={isDark ? "dark" : "light"}
+            data-bs-theme={isDark ? "dark" : "light"}
+            style={{ overflow: "hidden", backgroundColor: colors.pageBg }}
         >
             <div
                 className="d-flex flex-column mx-auto w-100 h-100 position-relative"
                 style={{
                     maxWidth: "768px",
                     overflow: "hidden",
-                    backgroundColor: "#f8f9fb",
+                    backgroundColor: colors.shellBg,
                 }}
             >
-                {/* HEADER */}
                 <header
-                    className="bg-white shadow-sm flex-shrink-0 z-3"
-                    style={{ paddingTop: "env(safe-area-inset-top)" }}
+                    className="shadow-sm flex-shrink-0 z-3"
+                    style={{
+                        paddingTop: "env(safe-area-inset-top)",
+                        backgroundColor: colors.headerBg,
+                        borderBottom: `1px solid ${colors.border}`,
+                    }}
                 >
                     <div className="px-3 py-3 d-flex align-items-center justify-content-between">
                         <button
                             onClick={() => navigate(-1)}
-                            className="btn btn-light rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
-                            style={{ width: "42px", height: "42px" }}
+                            className="btn rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm"
+                            style={{
+                                width: "42px",
+                                height: "42px",
+                                backgroundColor: colors.btnLightBg,
+                                color: colors.btnLightText,
+                            }}
                         >
                             <svg
                                 width="22"
@@ -196,42 +291,57 @@ export default function Reports() {
                         </button>
 
                         <div className="text-center">
-                            <h5 className="m-0 fw-bold text-dark" style={{ letterSpacing: "-0.5px" }}>
+                            <h5
+                                className="m-0 fw-bold"
+                                style={{ letterSpacing: "-0.5px", color: colors.textMain }}
+                            >
                                 Analytics & Reports
                             </h5>
-                            <div className="text-muted small">Track income and generate summaries</div>
+                            <div className="small" style={{ color: colors.textMuted }}>
+                                Track income and generate summaries
+                            </div>
                         </div>
 
                         <div style={{ width: 42 }}></div>
                     </div>
                 </header>
 
-                {/* SCROLL AREA */}
                 <main
                     className="d-flex flex-column w-100"
                     style={{
                         flex: "1 1 0",
                         overflowY: "auto",
                         overflowX: "hidden",
-                        backgroundColor: "#f8f9fb",
+                        backgroundColor: colors.pageBg,
                     }}
                 >
                     <div className="container py-4">
-                        {/* INCOME OVERVIEW */}
-                        <h6 className="text-muted small fw-bold text-uppercase ms-1 mb-3">
+                        <h6
+                            className="small fw-bold text-uppercase ms-1 mb-3"
+                            style={{ color: colors.textMuted }}
+                        >
                             Income Overview
                         </h6>
 
-                        <div className="bg-white p-1 rounded-pill shadow-sm d-flex mb-3 border">
+                        <div
+                            className="p-1 rounded-pill shadow-sm d-flex mb-3"
+                            style={{
+                                backgroundColor: colors.pillBg,
+                                border: colors.pillBorder,
+                            }}
+                        >
                             {["Daily", "Monthly", "Yearly"].map((range) => (
                                 <button
                                     key={range}
-                                    className={`btn btn-sm flex-grow-1 rounded-pill fw-bold border-0 ${timeRange === range
-                                            ? "bg-primary text-white shadow-sm"
-                                            : "text-muted bg-transparent"
+                                    className={`btn btn-sm flex-grow-1 rounded-pill fw-bold border-0 ${timeRange === range ? "" : ""
                                         }`}
                                     onClick={() => setTimeRange(range)}
-                                    style={{ transition: "all 0.2s ease" }}
+                                    style={{
+                                        transition: "all 0.2s ease",
+                                        backgroundColor: timeRange === range ? "#0d6efd" : "transparent",
+                                        color: timeRange === range ? "#ffffff" : colors.textMuted,
+                                        boxShadow: timeRange === range ? "0 2px 8px rgba(13,110,253,0.25)" : "none",
+                                    }}
                                 >
                                     {range}
                                 </button>
@@ -241,7 +351,7 @@ export default function Reports() {
                         <div
                             className="card border-0 shadow rounded-4 text-white mb-4 overflow-hidden"
                             style={{
-                                background: "linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)",
+                                background: colors.incomeCardBg,
                             }}
                         >
                             <div className="card-body p-4 text-center">
@@ -267,21 +377,33 @@ export default function Reports() {
                             </div>
                         </div>
 
-                        {/* REPORT SECTION */}
-                        <h6 className="text-muted small fw-bold text-uppercase ms-1 mb-3">
+                        <h6
+                            className="small fw-bold text-uppercase ms-1 mb-3"
+                            style={{ color: colors.textMuted }}
+                        >
                             Generate Report
                         </h6>
 
-                        <div className="card border-0 shadow-sm rounded-4 bg-white mb-3">
+                        <div
+                            className="card border-0 shadow-sm rounded-4 mb-3"
+                            style={{ backgroundColor: colors.cardBg }}
+                        >
                             <div className="card-body p-3 p-sm-4">
-                                <label className="form-label fw-bold small text-muted">
+                                <label
+                                    className="form-label fw-bold small"
+                                    style={{ color: colors.textMuted }}
+                                >
                                     Select Date
                                 </label>
 
                                 <input
                                     type="date"
-                                    className="form-control bg-light border-0 fw-bold mb-3 shadow-sm"
-                                    style={{ height: "52px" }}
+                                    className="form-control border-0 fw-bold mb-3 shadow-sm"
+                                    style={{
+                                        height: "52px",
+                                        backgroundColor: colors.inputBg,
+                                        color: colors.inputText,
+                                    }}
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
                                 />
@@ -307,21 +429,39 @@ export default function Reports() {
                                     />
                                     <SummaryCard
                                         title="Total"
-                                        value={`${currency.symbol} ${reportSummary.totalAmount.toLocaleString("en-IN", {
-                                            minimumFractionDigits: 2,
-                                        })}`}
+                                        value={`${currency.symbol} ${reportSummary.totalAmount.toLocaleString(
+                                            "en-IN",
+                                            {
+                                                minimumFractionDigits: 2,
+                                            }
+                                        )}`}
                                         subtitle="Day amount"
                                         tone="default"
                                     />
                                 </div>
 
                                 {reportData.length > 0 ? (
-                                    <div className="bg-light rounded-4 p-3 mb-3 border">
+                                    <div
+                                        className="rounded-4 p-3 mb-3"
+                                        style={{
+                                            backgroundColor: colors.softBg,
+                                            border: `1px solid ${colors.border}`,
+                                        }}
+                                    >
                                         <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
-                                            <span className="small text-muted fw-bold">
+                                            <span
+                                                className="small fw-bold"
+                                                style={{ color: colors.textMuted }}
+                                            >
                                                 Invoices Found
                                             </span>
-                                            <span className="badge bg-dark rounded-pill">
+                                            <span
+                                                className="badge rounded-pill"
+                                                style={{
+                                                    backgroundColor: colors.badgeBg,
+                                                    color: colors.badgeText,
+                                                }}
+                                            >
                                                 {reportData.length}
                                             </span>
                                         </div>
@@ -334,20 +474,30 @@ export default function Reports() {
                                                 <div
                                                     key={inv.id}
                                                     className="d-flex justify-content-between align-items-center small py-2 border-bottom"
-                                                    style={{ borderColor: "rgba(0,0,0,0.06)" }}
+                                                    style={{ borderColor: colors.border }}
                                                 >
                                                     <div className="me-3 overflow-hidden">
-                                                        <div className="fw-semibold text-dark text-truncate">
+                                                        <div
+                                                            className="fw-semibold text-truncate"
+                                                            style={{ color: colors.textMain }}
+                                                        >
                                                             {inv.clientName || "Unknown Client"}
                                                         </div>
-                                                        <div className="text-muted text-truncate">
+                                                        <div
+                                                            className="text-truncate"
+                                                            style={{ color: colors.textMuted }}
+                                                        >
                                                             {inv.invoiceNo}
                                                         </div>
                                                     </div>
 
                                                     <div className="text-end" style={{ minWidth: "90px" }}>
-                                                        <div className="fw-bold text-dark">
-                                                            {currency.symbol} {Number(inv.total || 0).toLocaleString("en-IN")}
+                                                        <div
+                                                            className="fw-bold"
+                                                            style={{ color: colors.textMain }}
+                                                        >
+                                                            {currency.symbol}{" "}
+                                                            {Number(inv.total || 0).toLocaleString("en-IN")}
                                                         </div>
                                                         <div
                                                             className={`small fw-semibold ${inv.paymentStatus === "Paid"
@@ -363,17 +513,27 @@ export default function Reports() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="text-center text-muted small py-4 mb-3 border rounded-4 bg-light">
+                                    <div
+                                        className="text-center small py-4 mb-3 rounded-4"
+                                        style={{
+                                            color: colors.textMuted,
+                                            backgroundColor: colors.emptyBg,
+                                            border: colors.emptyBorder,
+                                        }}
+                                    >
                                         No invoices found for this date.
                                     </div>
                                 )}
 
                                 <button
-                                    className="btn btn-dark w-100 py-3 rounded-4 fw-bold d-flex align-items-center justify-content-center gap-2"
+                                    className="btn w-100 py-3 rounded-4 fw-bold d-flex align-items-center justify-content-center gap-2"
                                     onClick={downloadReport}
                                     disabled={reportData.length === 0}
                                     style={{
                                         opacity: reportData.length === 0 ? 0.6 : 1,
+                                        backgroundColor: colors.previewBtnBg,
+                                        color: colors.previewBtnText,
+                                        border: "none",
                                     }}
                                 >
                                     <svg
